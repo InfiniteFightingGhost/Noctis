@@ -1,0 +1,33 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    container_name: noctis-timescaledb
+    environment:
+      POSTGRES_USER: noctis
+      POSTGRES_PASSWORD: noctis
+      POSTGRES_DB: noctis_ts
+    ports:
+      - "5432:5432"
+    volumes:
+     - timescale_data:/var/lib/postgresql/data
+     - ./timescaledb/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noctis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ml-api:
+    build: ../apps/py-ml-api
+    environment:
+      DATABASE_URL: postgresql+psycopg://noctis:noctis@localhost:5432/noctis_ts
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+
+volumes:
+  timescale_data:
+
