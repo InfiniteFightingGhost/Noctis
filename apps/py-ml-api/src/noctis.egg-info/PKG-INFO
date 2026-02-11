@@ -3,9 +3,9 @@ Name: noctis
 Version: 0.1.0
 Summary: Add your description here
 Requires-Python: >=3.11
-Description-Content-Type: text/markdown
 Requires-Dist: alembic>=1.18.3
 Requires-Dist: fastapi>=0.128.0
 Requires-Dist: numpy>=2.4.2
 Requires-Dist: pandas>=3.0.0
 Requires-Dist: psycopg>=3.3.2
+Requires-Dist: sqlalchemy>=2.0.46

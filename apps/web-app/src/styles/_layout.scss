@@ -1,0 +1,72 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-shell__content {
+  flex: 1;
+  padding: var(--space-5) var(--space-3) var(--space-6);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+  background: rgba(247, 244, 239, 0.9);
+  border-bottom: 1px solid rgba(15, 27, 45, 0.08);
+}
+
+.app-header__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-header__brand {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+}
+
+.app-header__nav {
+  display: flex;
+  gap: var(--space-2);
+  font-size: 0.95rem;
+}
+
+.app-header__nav a {
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  transition: all 0.2s ease;
+}
+
+.app-header__nav a.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.app-footer {
+  padding: var(--space-3);
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.page__intro {
+  display: grid;
+  gap: var(--space-2);
+}

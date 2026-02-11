@@ -1,0 +1,38 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "RawSleepSessionV1",
+    "type": "object",
+    "required": ["session_id", "device", "samplig_rate_hz", "start_ts", "channels"],
+    "properties": {
+        "session_id": {
+            "type": "string",
+            "description": "Globally unique session identifier"
+        },
+        "device": {
+            "type": "object",
+            "required": ["vendor", "model", "fw_version"]
+            "properties": {
+                "vendor": {"type": "string"},
+                "model": {"type": "string"},
+                "fw_version": {"type": "string"}
+            }
+        },
+        "samplig_rate_hz": {
+            "type": "number",
+            "exclusiveMinimum": 0
+        },
+        "statr_ts": {
+            "type": "integer",
+            "description": "Unix timestamp in milliseconds"
+        },
+        "channels": {
+            "type": "object",
+            "additionalProperties":{
+                "type": "array",
+                "items": {"type": "number"}
+            }
+            "description": "Globally unique session identifier"
+        },
+        "additionalProperties": false
+    }
+}

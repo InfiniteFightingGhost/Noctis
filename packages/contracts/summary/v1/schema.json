@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SleepSummaryV1",
+  "type": "object",
+  "required": ["session_id", "totals", "sleep_score"],
+  "properties": {
+    "session_id": { "type": "string" },
+    "totals": {
+      "type": "object",
+      "required": ["awake", "light", "deep", "rem"],
+      "properties": {
+        "awake": { "type": "number" },
+        "light": { "type": "number" },
+        "deep": { "type": "number" },
+        "rem": { "type": "number" }
+      }
+    },
+    "sleep_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    }
+  },
+  "additionalProperties": false
+}

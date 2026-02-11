@@ -1,0 +1,59 @@
+.ui-card {
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.ui-button {
+  border: none;
+  background: var(--ui-accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.6rem 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ui-input {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--ui-muted);
+}
+
+.ui-input__label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ui-input__field {
+  border: 1px solid rgba(15, 27, 45, 0.2);
+  border-radius: var(--ui-radius-md);
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+}
+
+.ui-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+
+.ui-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 27, 45, 0.4);
+}
+
+.ui-modal__panel {
+  position: relative;
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-lg);
+  padding: 2rem;
+  box-shadow: var(--ui-shadow-soft);
+  max-width: 560px;
+  width: calc(100% - 2rem);
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SleepStagePredictionV1",
+  "type": "object",
+  "required": ["window_id", "stage", "confidence"],
+  "properties": {
+    "window_id": { "type": "string" },
+    "stage": {
+      "type": "string",
+      "enum": ["awake", "n1", "n2", "n3", "rem"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "additionalProperties": false
+}

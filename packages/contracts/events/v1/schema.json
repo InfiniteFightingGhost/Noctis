@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PipelineEventV1",
+  "type": "object",
+  "required": ["type", "severity", "message"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["quality", "error", "warning"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "message": { "type": "string" },
+    "context": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
