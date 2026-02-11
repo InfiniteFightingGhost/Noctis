@@ -1,0 +1,11 @@
+.env
+.opencode/
+AGENTS.md
+agents/
+docs/
+tools/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.pyc

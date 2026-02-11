@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "features": [
+    "delta_power",
+    "theta_power",
+    "alpha_power",
+    "beta_power",
+    "sigma_power",
+    "emg_rms",
+    "eog_variance",
+    "hr_mean",
+    "hrv_rmssd",
+    "motion_index"
+  ]
+}

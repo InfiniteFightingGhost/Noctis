@@ -1,0 +1,8 @@
+{
+  "trained_on": "2026-02-01",
+  "commit": "local",
+  "metrics": {
+    "accuracy": 0.82,
+    "f1_macro": 0.78
+  }
+}

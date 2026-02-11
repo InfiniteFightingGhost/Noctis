@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: gunicorn -c /app/docker/gunicorn.conf.py app.main:app
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - timescaledb
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: noctis
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+
+volumes:
+  timescale-data:
