@@ -6,6 +6,8 @@ services:
     command: gunicorn -c /app/docker/gunicorn.conf.py app.main:app
     env_file:
       - .env
+    volumes:
+      - ./backups:/app/backups
     ports:
       - "8000:8000"
     depends_on:

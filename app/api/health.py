@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Request, Response
 from sqlalchemy import text
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
+from app.db.session import run_with_db_retry
+from app.utils.errors import ModelUnavailableError
 
 
 router = APIRouter(tags=["health"])
@@ -16,9 +16,15 @@ def healthz() -> dict:
 
 
 @router.get("/readyz")
-def readyz(request: Request, db: Session = Depends(get_db)) -> dict:
-    db.execute(text("SELECT 1"))
-    request.app.state.model_registry.get_loaded()
+def readyz(request: Request) -> dict:
+    def _op(session):
+        session.execute(text("SELECT 1"))
+
+    run_with_db_retry(_op, operation_name="readyz")
+    try:
+        request.app.state.model_registry.get_loaded()
+    except ModelUnavailableError:
+        return {"status": "degraded", "model": "unavailable"}
     return {"status": "ready"}
 
 

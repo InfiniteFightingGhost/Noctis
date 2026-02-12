@@ -38,6 +38,7 @@ class PredictionResponse(BaseSchema):
     model_version: str
     feature_schema_version: str
     predicted_stage: str
+    ground_truth_stage: str | None = None
     confidence: float
     probabilities: dict[str, float]
     created_at: datetime

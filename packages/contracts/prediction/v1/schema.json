@@ -1,18 +1,48 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "SleepStagePredictionV1",
+  "title": "PredictResponseV1",
   "type": "object",
-  "required": ["window_id", "stage", "confidence"],
+  "required": ["recording_id", "model_version", "feature_schema_version", "predictions"],
   "properties": {
-    "window_id": { "type": "string" },
-    "stage": {
+    "recording_id": {
       "type": "string",
-      "enum": ["awake", "n1", "n2", "n3", "rem"]
+      "format": "uuid"
     },
-    "confidence": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 1
+    "model_version": { "type": "string" },
+    "feature_schema_version": { "type": "string" },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "window_start_ts",
+          "window_end_ts",
+          "predicted_stage",
+          "confidence",
+          "probabilities"
+        ],
+        "properties": {
+          "window_start_ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window_end_ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "predicted_stage": { "type": "string" },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "probabilities": {
+            "type": "object",
+            "additionalProperties": { "type": "number" }
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

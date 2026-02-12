@@ -23,17 +23,28 @@ def _migrate(database_url: str) -> None:
 async def test_ingest_predict_flow() -> None:
     database_url = os.environ["INTEGRATION_TEST_DATABASE_URL"]
     os.environ["DATABASE_URL"] = database_url
-    os.environ["API_KEY"] = "test-key"
     _migrate(database_url)
 
     from app.main import create_app
+    from tests.utils.auth import build_auth_header, provision_service_client
 
     app = create_app()
+
+    ingest_client = provision_service_client(role="ingest")
+    read_client = provision_service_client(role="read")
+    ingest_headers = build_auth_header(ingest_client)
+    read_headers = build_auth_header(read_client)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        device = (await client.post("/v1/devices", json={"name": "device-1"})).json()
+        device = (
+            await client.post(
+                "/v1/devices",
+                json={"name": "device-1"},
+                headers=ingest_headers,
+            )
+        ).json()
         recording = (
             await client.post(
                 "/v1/recordings",
@@ -41,6 +52,7 @@ async def test_ingest_predict_flow() -> None:
                     "device_id": device["id"],
                     "started_at": datetime.now(timezone.utc).isoformat(),
                 },
+                headers=ingest_headers,
             )
         ).json()
 
@@ -59,7 +71,7 @@ async def test_ingest_predict_flow() -> None:
         ingest = (
             await client.post(
                 "/v1/epochs:ingest",
-                headers={"X-API-Key": "test-key"},
+                headers=ingest_headers,
                 json={"recording_id": recording["id"], "epochs": epochs},
             )
         ).json()
@@ -68,9 +80,25 @@ async def test_ingest_predict_flow() -> None:
         predict = (
             await client.post(
                 "/v1/predict",
-                headers={"X-API-Key": "test-key"},
+                headers=read_headers,
                 json={"recording_id": recording["id"]},
             )
         ).json()
         assert predict["model_version"] == "active"
         assert len(predict["predictions"]) == 1
+
+        evaluation = (
+            await client.get(
+                f"/v1/recordings/{recording['id']}/evaluation",
+                headers=read_headers,
+                params={
+                    "from": start.isoformat(),
+                    "to": (start + timedelta(minutes=10)).isoformat(),
+                },
+            )
+        ).json()
+        assert evaluation["scope"] == "recording"
+        assert evaluation["total_predictions"] >= 1
+
+        drift = (await client.get("/v1/model/drift", headers=read_headers)).json()
+        assert "metrics" in drift

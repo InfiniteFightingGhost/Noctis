@@ -1,0 +1,1415 @@
+{
+  "database_schema_overview": {
+    "source_priority": "ORM models in app/db/models.py; migration notes from alembic/versions/*.py",
+    "tables": [
+      {
+        "name": "tenants",
+        "sources": [
+          "app/db/models.py:25"
+        ]
+      },
+      {
+        "name": "devices",
+        "sources": [
+          "app/db/models.py:39"
+        ]
+      },
+      {
+        "name": "recordings",
+        "sources": [
+          "app/db/models.py:61"
+        ]
+      },
+      {
+        "name": "epochs",
+        "sources": [
+          "app/db/models.py:89"
+        ]
+      },
+      {
+        "name": "predictions",
+        "sources": [
+          "app/db/models.py:128"
+        ]
+      },
+      {
+        "name": "model_versions",
+        "sources": [
+          "app/db/models.py:176"
+        ]
+      },
+      {
+        "name": "experiments",
+        "sources": [
+          "app/db/models.py:196"
+        ]
+      },
+      {
+        "name": "training_runs",
+        "sources": [
+          "app/db/models.py:216"
+        ]
+      },
+      {
+        "name": "model_promotion_events",
+        "sources": [
+          "app/db/models.py:239"
+        ]
+      },
+      {
+        "name": "retrain_jobs",
+        "sources": [
+          "app/db/models.py:255"
+        ]
+      },
+      {
+        "name": "evaluation_metrics",
+        "sources": [
+          "app/db/models.py:284"
+        ]
+      },
+      {
+        "name": "model_usage_stats",
+        "sources": [
+          "app/db/models.py:308"
+        ]
+      },
+      {
+        "name": "feature_statistics",
+        "sources": [
+          "app/db/models.py:336"
+        ]
+      },
+      {
+        "name": "service_clients",
+        "sources": [
+          "app/db/models.py:374"
+        ]
+      },
+      {
+        "name": "service_client_keys",
+        "sources": [
+          "app/db/models.py:390"
+        ]
+      },
+      {
+        "name": "auditor_reports",
+        "sources": [
+          "app/db/models.py:414"
+        ]
+      },
+      {
+        "name": "audit_logs",
+        "sources": [
+          "app/db/models.py:432"
+        ]
+      }
+    ],
+    "table_definitions": [
+      {
+        "name": "tenants",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "name",
+            "type": "String(200)"
+          },
+          {
+            "name": "status",
+            "type": "String(32)"
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "uq_tenants_name",
+            "columns": [
+              "name"
+            ]
+          }
+        ],
+        "indexes": [],
+        "sources": [
+          "app/db/models.py:25"
+        ]
+      },
+      {
+        "name": "devices",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "name",
+            "type": "String(200)"
+          },
+          {
+            "name": "external_id",
+            "type": "String(200)",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "uq_devices_tenant_external",
+            "columns": [
+              "tenant_id",
+              "external_id"
+            ]
+          }
+        ],
+        "indexes": [
+          {
+            "name": "ix_devices_tenant",
+            "columns": [
+              "tenant_id"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial migration defines devices without tenant_id and with unique external_id."
+        ],
+        "sources": [
+          "app/db/models.py:39",
+          "alembic/versions/20260211_0001_init.py:17"
+        ]
+      },
+      {
+        "name": "recordings",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "device_id",
+            "type": "UUID",
+            "foreign_key": "devices.id"
+          },
+          {
+            "name": "started_at",
+            "type": "DateTime(timezone=True)"
+          },
+          {
+            "name": "ended_at",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "timezone",
+            "type": "String(64)",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_recordings_tenant_device",
+            "columns": [
+              "tenant_id",
+              "device_id"
+            ]
+          },
+          {
+            "name": "ix_recordings_tenant",
+            "columns": [
+              "tenant_id"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial migration defines recordings without tenant_id."
+        ],
+        "sources": [
+          "app/db/models.py:61",
+          "alembic/versions/20260211_0001_init.py:25"
+        ]
+      },
+      {
+        "name": "epochs",
+        "columns": [
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "recording_id",
+            "type": "UUID",
+            "foreign_key": "recordings.id",
+            "primary_key": true
+          },
+          {
+            "name": "epoch_index",
+            "type": "Integer"
+          },
+          {
+            "name": "epoch_start_ts",
+            "type": "DateTime(timezone=True)",
+            "primary_key": true
+          },
+          {
+            "name": "feature_schema_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "features_payload",
+            "type": "JSONB"
+          },
+          {
+            "name": "ingest_ts",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_epochs_tenant_recording_time",
+            "columns": [
+              "tenant_id",
+              "recording_id",
+              "epoch_start_ts"
+            ]
+          },
+          {
+            "name": "ix_epochs_tenant_recording_index",
+            "columns": [
+              "tenant_id",
+              "recording_id",
+              "epoch_index"
+            ]
+          },
+          {
+            "name": "ix_epochs_tenant_epoch_start_ts",
+            "columns": [
+              "tenant_id",
+              "epoch_start_ts"
+            ]
+          },
+          {
+            "name": "ix_epochs_recording_time",
+            "columns": [
+              "recording_id",
+              "epoch_start_ts"
+            ]
+          },
+          {
+            "name": "ix_epochs_recording_index",
+            "columns": [
+              "recording_id",
+              "epoch_index"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial migration defines epochs without tenant_id."
+        ],
+        "sources": [
+          "app/db/models.py:89",
+          "alembic/versions/20260211_0001_init.py:40"
+        ]
+      },
+      {
+        "name": "predictions",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "recording_id",
+            "type": "UUID",
+            "foreign_key": "recordings.id"
+          },
+          {
+            "name": "window_start_ts",
+            "type": "DateTime(timezone=True)"
+          },
+          {
+            "name": "window_end_ts",
+            "type": "DateTime(timezone=True)",
+            "primary_key": true
+          },
+          {
+            "name": "model_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "feature_schema_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "predicted_stage",
+            "type": "String(8)"
+          },
+          {
+            "name": "ground_truth_stage",
+            "type": "String(8)",
+            "nullable": true
+          },
+          {
+            "name": "probabilities",
+            "type": "JSONB"
+          },
+          {
+            "name": "confidence",
+            "type": "Float"
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "uq_prediction_window_end",
+            "columns": [
+              "recording_id",
+              "window_end_ts"
+            ]
+          }
+        ],
+        "indexes": [
+          {
+            "name": "ix_predictions_tenant_recording_time",
+            "columns": [
+              "tenant_id",
+              "recording_id",
+              "window_end_ts"
+            ]
+          },
+          {
+            "name": "ix_predictions_tenant_model_version",
+            "columns": [
+              "tenant_id",
+              "model_version",
+              "window_end_ts"
+            ]
+          },
+          {
+            "name": "ix_predictions_recording_time",
+            "columns": [
+              "recording_id",
+              "window_end_ts"
+            ]
+          },
+          {
+            "name": "ix_predictions_model_version",
+            "columns": [
+              "model_version",
+              "window_end_ts"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial migration defines predictions without tenant_id and ground_truth_stage."
+        ],
+        "sources": [
+          "app/db/models.py:128",
+          "alembic/versions/20260211_0001_init.py:67",
+          "alembic/versions/20260211_0002_monitoring.py:14"
+        ]
+      },
+      {
+        "name": "model_versions",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "version",
+            "type": "String(64)"
+          },
+          {
+            "name": "status",
+            "type": "String(32)"
+          },
+          {
+            "name": "metrics",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "feature_schema_version",
+            "type": "String(64)",
+            "nullable": true
+          },
+          {
+            "name": "artifact_path",
+            "type": "String(256)",
+            "nullable": true
+          },
+          {
+            "name": "details",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "promoted_at",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "promoted_by",
+            "type": "String(128)",
+            "nullable": true
+          },
+          {
+            "name": "archived_at",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "model_versions_version",
+            "columns": [
+              "version"
+            ]
+          },
+          {
+            "name": "uq_model_versions_production",
+            "columns": [
+              "status"
+            ],
+            "where": "status = 'production'"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "uq_model_versions_production",
+            "columns": [
+              "status"
+            ],
+            "unique": true,
+            "where": "status = 'production'"
+          }
+        ],
+        "migration_notes": [
+          "Initial migration defines model_versions with only id, version, details, created_at."
+        ],
+        "sources": [
+          "app/db/models.py:176",
+          "alembic/versions/20260211_0001_init.py:100",
+          "alembic/versions/20260211_0004_ml_lifecycle.py:14"
+        ]
+      },
+      {
+        "name": "experiments",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "name",
+            "type": "String(128)"
+          },
+          {
+            "name": "description",
+            "type": "String(256)",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "uq_experiments_tenant_name",
+            "columns": [
+              "tenant_id",
+              "name"
+            ]
+          }
+        ],
+        "indexes": [
+          {
+            "name": "ix_experiments_tenant",
+            "columns": [
+              "tenant_id"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial experiments migration uses unique name without tenant_id."
+        ],
+        "sources": [
+          "app/db/models.py:196",
+          "alembic/versions/20260211_0004_ml_lifecycle.py:52"
+        ]
+      },
+      {
+        "name": "training_runs",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "experiment_id",
+            "type": "UUID",
+            "nullable": true
+          },
+          {
+            "name": "model_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "status",
+            "type": "String(32)"
+          },
+          {
+            "name": "hyperparameters",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "dataset_snapshot",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "metrics",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "feature_schema_version",
+            "type": "String(64)",
+            "nullable": true
+          },
+          {
+            "name": "commit_hash",
+            "type": "String(64)",
+            "nullable": true
+          },
+          {
+            "name": "artifact_path",
+            "type": "String(256)",
+            "nullable": true
+          },
+          {
+            "name": "started_at",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "completed_at",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_training_runs_model",
+            "columns": [
+              "model_version",
+              "created_at"
+            ]
+          }
+        ],
+        "sources": [
+          "app/db/models.py:216",
+          "alembic/versions/20260211_0004_ml_lifecycle.py:60"
+        ]
+      },
+      {
+        "name": "model_promotion_events",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "model_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "previous_status",
+            "type": "String(32)",
+            "nullable": true
+          },
+          {
+            "name": "new_status",
+            "type": "String(32)"
+          },
+          {
+            "name": "actor",
+            "type": "String(128)"
+          },
+          {
+            "name": "reason",
+            "type": "String(256)",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [],
+        "sources": [
+          "app/db/models.py:239",
+          "alembic/versions/20260211_0004_ml_lifecycle.py:84"
+        ]
+      },
+      {
+        "name": "retrain_jobs",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "status",
+            "type": "String(32)"
+          },
+          {
+            "name": "drift_score",
+            "type": "Float"
+          },
+          {
+            "name": "triggering_features",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "suggested_from_ts",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "suggested_to_ts",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "dataset_config",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "training_config",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "model_version",
+            "type": "String(64)",
+            "nullable": true
+          },
+          {
+            "name": "error_message",
+            "type": "String(512)",
+            "nullable": true
+          },
+          {
+            "name": "started_at",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "completed_at",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_retrain_jobs_status",
+            "columns": [
+              "status",
+              "created_at"
+            ]
+          },
+          {
+            "name": "ix_retrain_jobs_tenant_status",
+            "columns": [
+              "tenant_id",
+              "status",
+              "created_at"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial retrain_jobs migration defines table without tenant_id and only ix_retrain_jobs_status."
+        ],
+        "sources": [
+          "app/db/models.py:255",
+          "alembic/versions/20260211_0004_ml_lifecycle.py:95"
+        ]
+      },
+      {
+        "name": "evaluation_metrics",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "model_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "recording_id",
+            "type": "UUID",
+            "nullable": true
+          },
+          {
+            "name": "from_ts",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "to_ts",
+            "type": "DateTime(timezone=True)",
+            "nullable": true
+          },
+          {
+            "name": "metrics",
+            "type": "JSONB"
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_evaluation_metrics_model",
+            "columns": [
+              "model_version",
+              "created_at"
+            ]
+          },
+          {
+            "name": "ix_evaluation_metrics_recording",
+            "columns": [
+              "recording_id",
+              "created_at"
+            ]
+          },
+          {
+            "name": "ix_evaluation_metrics_tenant",
+            "columns": [
+              "tenant_id",
+              "created_at"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial evaluation_metrics migration defines table without tenant_id."
+        ],
+        "sources": [
+          "app/db/models.py:284",
+          "alembic/versions/20260211_0002_monitoring.py:22"
+        ]
+      },
+      {
+        "name": "model_usage_stats",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "model_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "window_start_ts",
+            "type": "DateTime(timezone=True)"
+          },
+          {
+            "name": "window_end_ts",
+            "type": "DateTime(timezone=True)"
+          },
+          {
+            "name": "prediction_count",
+            "type": "Integer"
+          },
+          {
+            "name": "average_latency_ms",
+            "type": "Float"
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_model_usage_stats_model",
+            "columns": [
+              "model_version",
+              "created_at"
+            ]
+          },
+          {
+            "name": "ix_model_usage_stats_tenant_model",
+            "columns": [
+              "tenant_id",
+              "model_version",
+              "created_at"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial model_usage_stats migration defines table without tenant_id."
+        ],
+        "sources": [
+          "app/db/models.py:308",
+          "alembic/versions/20260211_0002_monitoring.py:43"
+        ]
+      },
+      {
+        "name": "feature_statistics",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "recording_id",
+            "type": "UUID",
+            "foreign_key": "recordings.id"
+          },
+          {
+            "name": "model_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "feature_schema_version",
+            "type": "String(64)"
+          },
+          {
+            "name": "stat_date",
+            "type": "Date"
+          },
+          {
+            "name": "window_end_ts",
+            "type": "DateTime(timezone=True)",
+            "primary_key": true
+          },
+          {
+            "name": "stats",
+            "type": "JSONB"
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "uq_feature_statistics_daily",
+            "columns": [
+              "tenant_id",
+              "recording_id",
+              "model_version",
+              "feature_schema_version",
+              "stat_date",
+              "window_end_ts"
+            ]
+          }
+        ],
+        "indexes": [
+          {
+            "name": "ix_feature_statistics_recording_date",
+            "columns": [
+              "recording_id",
+              "stat_date"
+            ]
+          },
+          {
+            "name": "ix_feature_statistics_model_date",
+            "columns": [
+              "model_version",
+              "stat_date"
+            ]
+          },
+          {
+            "name": "ix_feature_statistics_tenant_date",
+            "columns": [
+              "tenant_id",
+              "stat_date"
+            ]
+          }
+        ],
+        "migration_notes": [
+          "Initial feature_statistics migration defines table without tenant_id or stat_date; stat_date and unique daily constraint added later."
+        ],
+        "sources": [
+          "app/db/models.py:336",
+          "alembic/versions/20260211_0002_monitoring.py:59",
+          "alembic/versions/20260211_0003_feature_stats_daily.py:13"
+        ]
+      },
+      {
+        "name": "service_clients",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "name",
+            "type": "String(128)"
+          },
+          {
+            "name": "role",
+            "type": "String(32)"
+          },
+          {
+            "name": "status",
+            "type": "String(32)"
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "service_clients_name",
+            "columns": [
+              "name"
+            ]
+          }
+        ],
+        "indexes": [],
+        "sources": [
+          "app/db/models.py:374"
+        ]
+      },
+      {
+        "name": "service_client_keys",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "client_id",
+            "type": "UUID",
+            "foreign_key": "service_clients.id"
+          },
+          {
+            "name": "key_id",
+            "type": "String(64)"
+          },
+          {
+            "name": "public_key",
+            "type": "Text",
+            "nullable": true
+          },
+          {
+            "name": "secret",
+            "type": "String(256)",
+            "nullable": true
+          },
+          {
+            "name": "status",
+            "type": "String(32)"
+          },
+          {
+            "name": "created_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [
+          {
+            "name": "uq_service_client_keys_key_id",
+            "columns": [
+              "key_id"
+            ]
+          }
+        ],
+        "indexes": [
+          {
+            "name": "ix_service_client_keys_client",
+            "columns": [
+              "client_id",
+              "status"
+            ]
+          }
+        ],
+        "sources": [
+          "app/db/models.py:390"
+        ]
+      },
+      {
+        "name": "auditor_reports",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "issue_type",
+            "type": "String(64)"
+          },
+          {
+            "name": "severity",
+            "type": "String(16)"
+          },
+          {
+            "name": "recording_id",
+            "type": "UUID",
+            "nullable": true
+          },
+          {
+            "name": "detected_at",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_auditor_reports_tenant",
+            "columns": [
+              "tenant_id",
+              "detected_at"
+            ]
+          }
+        ],
+        "sources": [
+          "app/db/models.py:414"
+        ]
+      },
+      {
+        "name": "audit_logs",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "primary_key": true
+          },
+          {
+            "name": "tenant_id",
+            "type": "UUID",
+            "foreign_key": "tenants.id"
+          },
+          {
+            "name": "actor",
+            "type": "String(128)"
+          },
+          {
+            "name": "action",
+            "type": "String(128)"
+          },
+          {
+            "name": "target_type",
+            "type": "String(128)"
+          },
+          {
+            "name": "target_id",
+            "type": "String(128)",
+            "nullable": true
+          },
+          {
+            "name": "metadata",
+            "type": "JSONB",
+            "nullable": true
+          },
+          {
+            "name": "timestamp",
+            "type": "DateTime(timezone=True)"
+          }
+        ],
+        "uniques": [],
+        "indexes": [
+          {
+            "name": "ix_audit_logs_tenant",
+            "columns": [
+              "tenant_id",
+              "timestamp"
+            ]
+          }
+        ],
+        "sources": [
+          "app/db/models.py:432"
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "from": "devices.tenant_id",
+        "to": "tenants.id",
+        "sources": [
+          "app/db/models.py:49"
+        ]
+      },
+      {
+        "from": "recordings.tenant_id",
+        "to": "tenants.id",
+        "sources": [
+          "app/db/models.py:71"
+        ]
+      },
+      {
+        "from": "recordings.device_id",
+        "to": "devices.id",
+        "sources": [
+          "app/db/models.py:74"
+        ]
+      },
+      {
+        "from": "epochs.recording_id",
+        "to": "recordings.id",
+        "sources": [
+          "app/db/models.py:112"
+        ]
+      },
+      {
+        "from": "predictions.recording_id",
+        "to": "recordings.id",
+        "sources": [
+          "app/db/models.py:156"
+        ]
+      },
+      {
+        "from": "feature_statistics.recording_id",
+        "to": "recordings.id",
+        "sources": [
+          "app/db/models.py:359"
+        ]
+      },
+      {
+        "from": "service_client_keys.client_id",
+        "to": "service_clients.id",
+        "sources": [
+          "app/db/models.py:400"
+        ]
+      },
+      {
+        "from": "audit_logs.tenant_id",
+        "to": "tenants.id",
+        "sources": [
+          "app/db/models.py:439"
+        ]
+      },
+      {
+        "from": "auditor_reports.tenant_id",
+        "to": "tenants.id",
+        "sources": [
+          "app/db/models.py:421"
+        ]
+      }
+    ],
+    "hypertables": [
+      {
+        "name": "epochs",
+        "time_column": "epoch_start_ts",
+        "chunk_interval": "1 day",
+        "sources": [
+          "alembic/versions/20260211_0001_init.py:108"
+        ]
+      },
+      {
+        "name": "predictions",
+        "time_column": "window_end_ts",
+        "chunk_interval": "1 day",
+        "sources": [
+          "alembic/versions/20260211_0001_init.py:111"
+        ]
+      },
+      {
+        "name": "feature_statistics",
+        "time_column": "window_end_ts",
+        "chunk_interval": "1 day",
+        "sources": [
+          "alembic/versions/20260211_0002_monitoring.py:90"
+        ]
+      }
+    ],
+    "primary_keys": [
+      {
+        "table": "epochs",
+        "keys": [
+          "recording_id",
+          "epoch_start_ts"
+        ],
+        "sources": [
+          "app/db/models.py:112"
+        ]
+      },
+      {
+        "table": "predictions",
+        "keys": [
+          "id",
+          "window_end_ts"
+        ],
+        "sources": [
+          "app/db/models.py:150",
+          "app/db/models.py:160"
+        ]
+      },
+      {
+        "table": "feature_statistics",
+        "keys": [
+          "id",
+          "window_end_ts"
+        ],
+        "sources": [
+          "app/db/models.py:353",
+          "app/db/models.py:365"
+        ]
+      },
+      {
+        "table": "all_other_tables",
+        "keys": [
+          "id"
+        ],
+        "sources": [
+          "app/db/models.py:29"
+        ]
+      }
+    ],
+    "uniqueness_constraints": [
+      {
+        "statement": "tenants.name unique",
+        "sources": [
+          "app/db/models.py:27"
+        ]
+      },
+      {
+        "statement": "devices (tenant_id, external_id) unique",
+        "sources": [
+          "app/db/models.py:42"
+        ]
+      },
+      {
+        "statement": "predictions (recording_id, window_end_ts) unique",
+        "sources": [
+          "app/db/models.py:131"
+        ]
+      },
+      {
+        "statement": "model_versions.version unique",
+        "sources": [
+          "app/db/models.py:182"
+        ]
+      },
+      {
+        "statement": "experiments (tenant_id, name) unique",
+        "sources": [
+          "app/db/models.py:198"
+        ]
+      },
+      {
+        "statement": "feature_statistics daily unique composite",
+        "sources": [
+          "app/db/models.py:339"
+        ]
+      },
+      {
+        "statement": "service_client_keys.key_id unique",
+        "sources": [
+          "app/db/models.py:393"
+        ]
+      },
+      {
+        "statement": "single production model enforced by partial unique index",
+        "sources": [
+          "alembic/versions/20260211_0004_ml_lifecycle.py:45"
+        ]
+      }
+    ]
+  }
+}
