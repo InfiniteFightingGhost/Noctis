@@ -1,14 +1,10 @@
 /*
- * ESP32 Sleep Monitor - v3.5
+ * ESP32 Sleep Monitor - v3.6
  *
- * ROOT CAUSE FIX: Metadata was being written twice to the same flash
- * address without erasing between writes. Flash bits can only change
- * 1→0, never 0→1. So totalChunks=0 AND totalChunks=1 = 0. Extractor
- * always saw 0 chunks even though chunk data was saved correctly.
+ * FIX from v3.5: Radar sampling now stores ALL samples (not just valid ones)
+ * and uses movement-based "in bed" detection instead of eInOrNotInBed.
  *
- * FIX: Metadata lives in its own dedicated sector (sector 1, addr 0x1000).
- * That sector is ALWAYS erased before every metadata write. Chunk data
- * starts at sector 2 (addr 0x2000) and is completely untouched by this.
+ * v3.5 fix: Metadata in sector 1 (0x1000) prevents corruption.
  *
  * Flash layout:
  *   Sector 0  (0x0000-0x0FFF): unused / reserved
@@ -191,7 +187,7 @@ void setup() {
   esp_task_wdt_add(NULL);
 
   Serial.println("\n╔══════════════════════════════════╗");
-  Serial.println("║   Sleep Monitor v3.5             ║");
+  Serial.println("║   Sleep Monitor v3.6             ║");
   Serial.println("╚══════════════════════════════════╝");
 
   if (!rtc.begin())             { Serial.println("✗ RTC fail!");    indicateError(1); }
@@ -343,15 +339,22 @@ void loop() {
     int hr = radar.getHeartRate();
     int rr = radar.getBreatheValue();
 
-    if (hr > 30 && hr < 200 && bufferIndex < MAX_SAMPLES_PER_EPOCH) {
+    // Store ALL samples (even zeros) - we'll track quality separately
+    if (bufferIndex < MAX_SAMPLES_PER_EPOCH) {
       hrBuffer[bufferIndex] = (uint8_t)hr;
       rrBuffer[bufferIndex] = (uint8_t)rr;
-      sumHR += hr;
-      sumRR += rr;
       bufferIndex++;
     }
+    
+    sumHR += hr;
+    sumRR += rr;
 
-    if (radar.smSleepData(radar.eInOrNotInBed) == 1) sumInBed++;
+    // Better "in bed" detection: valid vitals + low movement
+    uint16_t movement = radar.smHumanData(radar.eHumanMovement);
+    bool validVitals = (hr > 40 && hr < 180 && rr > 8 && rr < 30);
+    bool inBed = validVitals && (movement < 10);
+    
+    if (inBed) sumInBed++;
     radarSamples++;
   }
 
