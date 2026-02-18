@@ -14,8 +14,10 @@ from app.dataset.config import DatasetBuildConfig
 from app.dataset.io import export_hdf5, export_parquet, save_npz
 from app.db.models import Epoch, Prediction, Recording
 from app.db.session import run_with_db_retry
+from app.feature_store.schema import FeatureSchemaRecord
+from app.feature_store.service import get_feature_schema_by_version
 from app.ml.feature_decode import decode_features
-from app.ml.feature_schema import FeatureSchema, load_feature_schema
+from app.ml.feature_schema import load_feature_schema
 from app.services.windowing import WindowedEpoch, build_windows
 
 
@@ -23,6 +25,7 @@ from app.services.windowing import WindowedEpoch, build_windows
 class DatasetBuildResult:
     X: np.ndarray
     y: np.ndarray
+    label_sources: np.ndarray
     label_map: list[str]
     window_end_ts: np.ndarray
     recording_ids: np.ndarray
@@ -30,14 +33,32 @@ class DatasetBuildResult:
     metadata: dict[str, Any]
 
 
-def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
-    feature_schema = load_feature_schema(config.feature_schema_path)
+def _resolve_feature_schema(
+    session: Session, config: DatasetBuildConfig
+) -> FeatureSchemaRecord:
+    if config.feature_schema_version:
+        schema = get_feature_schema_by_version(session, config.feature_schema_version)
+        if schema is None:
+            raise ValueError("Feature schema not registered")
+        return schema
+    if config.feature_schema_path:
+        file_schema = load_feature_schema(config.feature_schema_path)
+        schema = get_feature_schema_by_version(session, file_schema.version)
+        if schema is None:
+            raise ValueError("Feature schema not registered")
+        if schema.feature_names != file_schema.features:
+            raise ValueError("Feature schema ordering mismatch")
+        return schema
+    raise ValueError("feature_schema_version is required")
 
+
+def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
     def _op(session: Session) -> DatasetBuildResult:
+        feature_schema = _resolve_feature_schema(session, config)
         epochs = _fetch_epochs(session, config, feature_schema)
         windows, window_meta = _build_windows(epochs, config)
-        labels = _fetch_labels(session, config, window_meta)
-        X, y, window_end_ts, recording_ids = _align_labels(
+        labels = _fetch_labels(session, config, window_meta, feature_schema.version)
+        X, y, label_sources, window_end_ts, recording_ids = _align_labels(
             windows,
             window_meta,
             labels,
@@ -45,9 +66,10 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
         )
         if X.size == 0:
             raise ValueError("No labeled windows found for dataset")
-        X, y, window_end_ts, recording_ids = _balance_classes(
+        X, y, label_sources, window_end_ts, recording_ids = _balance_classes(
             X,
             y,
+            label_sources,
             window_end_ts,
             recording_ids,
             strategy=config.balance_strategy,
@@ -65,6 +87,7 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
         result = DatasetBuildResult(
             X=X,
             y=y,
+            label_sources=label_sources,
             label_map=label_map,
             window_end_ts=window_end_ts,
             recording_ids=recording_ids,
@@ -80,7 +103,7 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
 def _fetch_epochs(
     session: Session,
     config: DatasetBuildConfig,
-    feature_schema: FeatureSchema,
+    feature_schema: FeatureSchemaRecord,
 ) -> dict[object, list[WindowedEpoch]]:
     query = session.query(
         Epoch.recording_id,
@@ -100,10 +123,11 @@ def _fetch_epochs(
         query = query.filter(Epoch.epoch_start_ts >= filters.from_ts)
     if filters.to_ts:
         query = query.filter(Epoch.epoch_start_ts <= filters.to_ts)
-    if filters.feature_schema_version:
-        query = query.filter(
-            Epoch.feature_schema_version == filters.feature_schema_version
-        )
+    if filters.feature_schema_version and (
+        filters.feature_schema_version != feature_schema.version
+    ):
+        raise ValueError("Feature schema filter mismatch")
+    query = query.filter(Epoch.feature_schema_version == feature_schema.version)
     rows = query.order_by(
         Epoch.recording_id, Epoch.epoch_index, Epoch.epoch_start_ts
     ).all()
@@ -120,6 +144,7 @@ def _fetch_epochs(
                 epoch_index=epoch_index,
                 epoch_start_ts=epoch_start_ts,
                 features=vector,
+                feature_schema_id=feature_schema.id,
             )
         )
     return epochs
@@ -154,6 +179,7 @@ def _fetch_labels(
     session: Session,
     config: DatasetBuildConfig,
     window_meta: list[dict[str, Any]],
+    feature_schema_version: str,
 ) -> dict[tuple[str, datetime], dict[str, Any]]:
     filters = config.filters
     recording_ids = {
@@ -175,10 +201,11 @@ def _fetch_labels(
         query = query.filter(Recording.tenant_id == filters.tenant_id)
     if filters.model_version:
         query = query.filter(Prediction.model_version == filters.model_version)
-    if filters.feature_schema_version:
-        query = query.filter(
-            Prediction.feature_schema_version == filters.feature_schema_version
-        )
+    if filters.feature_schema_version and (
+        filters.feature_schema_version != feature_schema_version
+    ):
+        raise ValueError("Feature schema filter mismatch")
+    query = query.filter(Prediction.feature_schema_version == feature_schema_version)
     if filters.from_ts:
         query = query.filter(Prediction.window_end_ts >= filters.from_ts)
     if filters.to_ts:
@@ -199,9 +226,10 @@ def _align_labels(
     labels: dict[tuple[str, datetime], dict[str, Any]],
     *,
     label_strategy: str,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     X: list[np.ndarray] = []
     y: list[str] = []
+    label_sources: list[str] = []
     window_end_ts: list[str] = []
     recording_ids: list[str] = []
     for tensor, meta in zip(windows, window_meta):
@@ -213,46 +241,57 @@ def _align_labels(
         label_info = labels.get(key)
         if not label_info:
             continue
-        label = _select_label(label_info, label_strategy)
-        if label is None:
+        label, source = _select_label(label_info, label_strategy)
+        if label is None or source is None:
             continue
         X.append(tensor)
         y.append(label)
+        label_sources.append(source)
         window_end_ts.append(window_ts.isoformat())
         recording_ids.append(str(recording_id))
     return (
         np.asarray(X, dtype=np.float32),
         np.asarray(y),
+        np.asarray(label_sources),
         np.asarray(window_end_ts),
         np.asarray(recording_ids),
     )
 
 
-def _select_label(label_info: dict[str, Any], label_strategy: str) -> str | None:
+def _select_label(
+    label_info: dict[str, Any], label_strategy: str
+) -> tuple[str | None, str | None]:
     if label_strategy == "ground_truth_only":
-        return label_info.get("ground_truth_stage")
+        label = label_info.get("ground_truth_stage")
+        return label, "ground_truth" if label else None
     if label_strategy == "predicted_only":
-        return label_info.get("predicted_stage")
+        label = label_info.get("predicted_stage")
+        return label, "predicted" if label else None
     if label_strategy == "ground_truth_or_predicted":
-        return label_info.get("ground_truth_stage") or label_info.get("predicted_stage")
+        ground_truth = label_info.get("ground_truth_stage")
+        if ground_truth:
+            return ground_truth, "ground_truth"
+        predicted = label_info.get("predicted_stage")
+        return predicted, "predicted" if predicted else None
     raise ValueError("Unknown label strategy")
 
 
 def _balance_classes(
     X: np.ndarray,
     y: np.ndarray,
+    label_sources: np.ndarray,
     window_end_ts: np.ndarray,
     recording_ids: np.ndarray,
     *,
     strategy: str,
     seed: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     if strategy == "none":
-        return X, y, window_end_ts, recording_ids
+        return X, y, label_sources, window_end_ts, recording_ids
     rng = np.random.default_rng(seed)
     unique, counts = np.unique(y, return_counts=True)
     if len(unique) == 0:
-        return X, y, window_end_ts, recording_ids
+        return X, y, label_sources, window_end_ts, recording_ids
     target = counts.min() if strategy == "undersample" else counts.max()
     indices: list[int] = []
     for label in unique:
@@ -265,7 +304,13 @@ def _balance_classes(
             raise ValueError("Unknown balance strategy")
         indices.extend(chosen.tolist())
     indices = sorted(indices)
-    return X[indices], y[indices], window_end_ts[indices], recording_ids[indices]
+    return (
+        X[indices],
+        y[indices],
+        label_sources[indices],
+        window_end_ts[indices],
+        recording_ids[indices],
+    )
 
 
 def _stratified_split_indices(
@@ -342,7 +387,7 @@ def _stratified_split_indices(
 
 def _build_metadata(
     config: DatasetBuildConfig,
-    feature_schema: FeatureSchema,
+    feature_schema: FeatureSchemaRecord,
     label_map: list[str],
     splits: dict[str, np.ndarray],
 ) -> dict[str, Any]:
@@ -351,7 +396,12 @@ def _build_metadata(
         "window_size": config.window_size,
         "allow_padding": config.allow_padding,
         "feature_schema_version": feature_schema.version,
-        "feature_schema_path": str(config.feature_schema_path),
+        "feature_schema_id": str(feature_schema.id),
+        "feature_schema_hash": feature_schema.hash,
+        "feature_names": feature_schema.feature_names,
+        "feature_schema_path": str(config.feature_schema_path)
+        if config.feature_schema_path
+        else None,
         "git_commit_hash": _git_commit_hash(),
         "filters": {
             "from_ts": config.filters.from_ts.isoformat()
@@ -388,8 +438,26 @@ def _git_commit_hash() -> str | None:
 def _export_dataset(
     result: DatasetBuildResult,
     config: DatasetBuildConfig,
-    feature_schema: FeatureSchema,
+    feature_schema: FeatureSchemaRecord,
 ) -> None:
+    feature_payload = [
+        {
+            "name": feature.name,
+            "dtype": feature.dtype,
+            "allowed_range": feature.allowed_range,
+            "description": feature.description,
+            "introduced_in_version": feature.introduced_in_version,
+            "deprecated_in_version": feature.deprecated_in_version,
+            "position": feature.position,
+        }
+        for feature in feature_schema.features
+    ]
+    feature_schema_payload = {
+        "id": str(feature_schema.id),
+        "version": feature_schema.version,
+        "hash": feature_schema.hash,
+        "features": feature_payload,
+    }
     if config.export_format == "npz":
         save_npz(
             config.output_dir,
@@ -402,13 +470,7 @@ def _export_dataset(
             metadata=result.metadata,
         )
         (config.output_dir / "feature_schema.json").write_text(
-            json.dumps(
-                {
-                    "version": feature_schema.version,
-                    "features": feature_schema.features,
-                },
-                indent=2,
-            )
+            json.dumps(feature_schema_payload, indent=2)
         )
         return
     if config.export_format == "parquet":
@@ -421,7 +483,10 @@ def _export_dataset(
             recording_ids=result.recording_ids,
             splits=result.splits,
             metadata=result.metadata,
-            feature_names=feature_schema.features,
+            feature_names=feature_schema.feature_names,
+        )
+        (config.output_dir / "feature_schema.json").write_text(
+            json.dumps(feature_schema_payload, indent=2)
         )
         return
     if config.export_format == "hdf5":
@@ -434,6 +499,9 @@ def _export_dataset(
             recording_ids=result.recording_ids,
             splits=result.splits,
             metadata=result.metadata,
+        )
+        (config.output_dir / "feature_schema.json").write_text(
+            json.dumps(feature_schema_payload, indent=2)
         )
         return
     raise ValueError("Unsupported export format")

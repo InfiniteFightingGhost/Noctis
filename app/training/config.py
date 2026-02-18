@@ -20,7 +20,8 @@ class TrainingSearchConfig:
 class TrainingConfig:
     dataset_dir: Path
     output_root: Path
-    feature_schema_path: Path
+    feature_schema_path: Path | None
+    dataset_snapshot_id: str | None = None
     model_type: str = "gradient_boosting"
     random_seed: int = 42
     class_balance: str = "none"
@@ -42,7 +43,10 @@ def training_config_from_payload(payload: dict[str, Any]) -> TrainingConfig:
     config = TrainingConfig(
         dataset_dir=Path(payload["dataset_dir"]),
         output_root=Path(payload.get("output_root", "models")),
-        feature_schema_path=Path(payload["feature_schema_path"]),
+        feature_schema_path=Path(payload["feature_schema_path"])
+        if payload.get("feature_schema_path")
+        else None,
+        dataset_snapshot_id=payload.get("dataset_snapshot_id"),
         model_type=payload.get("model_type", "gradient_boosting"),
         random_seed=int(payload.get("random_seed", 42)),
         class_balance=payload.get("class_balance", "none"),

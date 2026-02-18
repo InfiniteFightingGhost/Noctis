@@ -47,8 +47,13 @@ def main() -> None:
             version=result.version,
             status="staging",
             metrics=result.metrics,
-            feature_schema_path=config.feature_schema_path,
+            feature_schema_version=result.feature_schema_version,
             artifact_path=str(result.artifact_dir),
+            dataset_snapshot_id=result.dataset_snapshot_id,
+            training_seed=result.training_seed,
+            git_commit_hash=result.git_commit_hash,
+            metrics_hash=result.metrics_hash,
+            artifact_hash=result.artifact_hash,
         )
         register_training_run(
             session,
@@ -67,8 +72,9 @@ def main() -> None:
                 },
             },
             dataset_dir=str(config.dataset_dir),
-            feature_schema_path=config.feature_schema_path,
+            feature_schema_version=result.feature_schema_version,
             artifact_path=str(result.artifact_dir),
+            dataset_snapshot_id=result.dataset_snapshot_id,
         )
 
     run_with_db_retry(_register, commit=True, operation_name="register_training_run")

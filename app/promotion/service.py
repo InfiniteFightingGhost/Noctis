@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.settings import get_settings
 from app.db.models import ModelPromotionEvent, ModelVersion
+from app.feature_store.service import get_active_feature_schema
 
 
 def promote_model(
@@ -21,6 +22,7 @@ def promote_model(
     reason: str | None,
 ) -> ModelVersion:
     model = _get_model(session, version)
+    _assert_schema_compatibility(session, model)
     _assert_metrics_thresholds(model)
     current_prod = _get_current_production(session)
     if current_prod and current_prod.version == model.version:
@@ -60,6 +62,7 @@ def rollback_model(
     reason: str | None,
 ) -> ModelVersion:
     model = _get_model(session, version)
+    _assert_schema_compatibility(session, model)
     current_prod = _get_current_production(session)
     if current_prod and current_prod.version == model.version:
         return model
@@ -117,6 +120,7 @@ def _update_status(
     if status == "production":
         model.promoted_at = datetime.now(timezone.utc)
         model.promoted_by = actor
+        model.deployed_at = datetime.now(timezone.utc)
     if status == "archived":
         model.archived_at = datetime.now(timezone.utc)
     model.details = {
@@ -166,3 +170,9 @@ def _activate_model_artifacts(model: ModelVersion) -> None:
     temp_dir.replace(active_dir)
     if temp_base.exists():
         shutil.rmtree(temp_base)
+
+
+def _assert_schema_compatibility(session: Session, model: ModelVersion) -> None:
+    active_schema = get_active_feature_schema(session)
+    if model.feature_schema_version != active_schema.version:
+        raise ValueError("Model feature schema mismatch with active schema")

@@ -41,20 +41,42 @@ def register_model_version(
     version: str,
     status: str,
     metrics: dict[str, Any],
-    feature_schema_path: Path,
+    feature_schema_version: str | None = None,
+    feature_schema_path: Path | None = None,
     artifact_path: str,
+    dataset_snapshot_id: uuid.UUID | str | None = None,
+    training_seed: int | None = None,
+    git_commit_hash: str | None = None,
+    metrics_hash: str | None = None,
+    artifact_hash: str | None = None,
 ) -> ModelVersion:
     existing = session.execute(
         select(ModelVersion).where(ModelVersion.version == version)
     ).scalar_one_or_none()
     if existing:
         raise ValueError("Model version already registered")
-    schema = load_feature_schema(feature_schema_path)
+    if feature_schema_version is None:
+        if feature_schema_path is None:
+            raise ValueError("feature_schema_version is required")
+        schema = load_feature_schema(feature_schema_path)
+        feature_schema_version = schema.version
+    dataset_snapshot_uuid: uuid.UUID | None = None
+    if dataset_snapshot_id:
+        dataset_snapshot_uuid = (
+            dataset_snapshot_id
+            if isinstance(dataset_snapshot_id, uuid.UUID)
+            else uuid.UUID(str(dataset_snapshot_id))
+        )
     model_version = ModelVersion(
         version=version,
         status=status,
         metrics=metrics,
-        feature_schema_version=schema.version,
+        feature_schema_version=feature_schema_version,
+        dataset_snapshot_id=dataset_snapshot_uuid,
+        training_seed=training_seed,
+        git_commit_hash=git_commit_hash,
+        metrics_hash=metrics_hash,
+        artifact_hash=artifact_hash,
         artifact_path=artifact_path,
         details={"created_at": datetime.now(timezone.utc).isoformat()},
     )
@@ -72,11 +94,24 @@ def register_training_run(
     metrics: dict[str, Any],
     hyperparameters: dict[str, Any],
     dataset_dir: str,
-    feature_schema_path: Path,
+    feature_schema_version: str | None = None,
+    feature_schema_path: Path | None = None,
     artifact_path: str,
+    dataset_snapshot_id: uuid.UUID | str | None = None,
 ) -> TrainingRun:
     dataset_snapshot = _load_dataset_snapshot(Path(dataset_dir))
-    schema = load_feature_schema(feature_schema_path)
+    if feature_schema_version is None:
+        if feature_schema_path is None:
+            raise ValueError("feature_schema_version is required")
+        schema = load_feature_schema(feature_schema_path)
+        feature_schema_version = schema.version
+    dataset_snapshot_uuid: uuid.UUID | None = None
+    if dataset_snapshot_id:
+        dataset_snapshot_uuid = (
+            dataset_snapshot_id
+            if isinstance(dataset_snapshot_id, uuid.UUID)
+            else uuid.UUID(str(dataset_snapshot_id))
+        )
     run = TrainingRun(
         experiment_id=experiment_id,
         model_version=model_version,
@@ -84,7 +119,7 @@ def register_training_run(
         hyperparameters=hyperparameters,
         dataset_snapshot=dataset_snapshot,
         metrics=metrics,
-        feature_schema_version=schema.version,
+        feature_schema_version=feature_schema_version,
         commit_hash=_read_commit_hash(dataset_snapshot),
         artifact_path=artifact_path,
         started_at=datetime.now(timezone.utc),
@@ -92,6 +127,13 @@ def register_training_run(
     )
     session.add(run)
     session.flush()
+    if dataset_snapshot_uuid:
+        session.query(ModelVersion).filter(
+            ModelVersion.version == model_version
+        ).update({ModelVersion.dataset_snapshot_id: dataset_snapshot_uuid})
+    session.query(ModelVersion).filter(ModelVersion.version == model_version).update(
+        {ModelVersion.training_run_id: run.id}
+    )
     return run
 
 
@@ -120,10 +162,17 @@ def list_models(session: Session) -> list[dict[str, Any]]:
             "status": model.status,
             "metrics": model.metrics,
             "feature_schema_version": model.feature_schema_version,
+            "dataset_snapshot_id": model.dataset_snapshot_id,
+            "training_run_id": model.training_run_id,
+            "git_commit_hash": model.git_commit_hash,
+            "training_seed": model.training_seed,
+            "metrics_hash": model.metrics_hash,
+            "artifact_hash": model.artifact_hash,
             "artifact_path": model.artifact_path,
             "created_at": model.created_at,
             "promoted_at": model.promoted_at,
             "promoted_by": model.promoted_by,
+            "deployed_at": model.deployed_at,
         }
         for model in models
     ]
@@ -140,10 +189,17 @@ def get_model(session: Session, version: str) -> dict[str, Any] | None:
         "status": model.status,
         "metrics": model.metrics,
         "feature_schema_version": model.feature_schema_version,
+        "dataset_snapshot_id": model.dataset_snapshot_id,
+        "training_run_id": model.training_run_id,
+        "git_commit_hash": model.git_commit_hash,
+        "training_seed": model.training_seed,
+        "metrics_hash": model.metrics_hash,
+        "artifact_hash": model.artifact_hash,
         "artifact_path": model.artifact_path,
         "created_at": model.created_at,
         "promoted_at": model.promoted_at,
         "promoted_by": model.promoted_by,
+        "deployed_at": model.deployed_at,
         "details": model.details,
     }
 

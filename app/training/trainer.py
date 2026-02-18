@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import uuid
 
 import joblib
 import numpy as np
@@ -19,7 +20,12 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 
+from app.db.session import run_with_db_retry
+from app.feature_store.service import get_feature_schema_by_version
+from app.lineage.service import build_lineage_metadata
 from app.ml.feature_schema import FeatureSchema, load_feature_schema
+from app.reproducibility.hashing import hash_artifact_dir, hash_json
+from app.reproducibility.snapshots import verify_snapshot_checksum
 from app.training.config import TrainingConfig
 
 
@@ -29,6 +35,12 @@ class TrainingResult:
     artifact_dir: Path
     metrics: dict[str, Any]
     label_map: list[str]
+    dataset_snapshot_id: str
+    feature_schema_version: str
+    git_commit_hash: str | None
+    training_seed: int
+    metrics_hash: str
+    artifact_hash: str
 
 
 def train_model(
@@ -37,7 +49,14 @@ def train_model(
     version: str,
 ) -> TrainingResult:
     dataset = _load_dataset(config.dataset_dir)
-    feature_schema = load_feature_schema(config.feature_schema_path)
+    dataset_metadata = _load_dataset_metadata(config.dataset_dir)
+    snapshot_id = _resolve_snapshot_id(config, dataset_metadata)
+    feature_schema_path = _resolve_feature_schema_path(config)
+    feature_schema = load_feature_schema(feature_schema_path)
+    schema_record = _resolve_feature_schema_record(feature_schema, dataset_metadata)
+    _verify_snapshot_integrity(
+        snapshot_id, schema_record, feature_schema, dataset_metadata
+    )
     X, y, label_map = _prepare_features(dataset, config, feature_schema)
     splits = _extract_splits(dataset)
     train_idx = splits.get("train")
@@ -66,28 +85,62 @@ def train_model(
     y_pred = estimator.predict(X_eval)
     metrics = _evaluate_metrics(y_eval, y_pred, label_map)
     metrics["evaluation_split"] = "test" if eval_idx is test_idx else "val"
+    metrics_hash = hash_json(metrics)
     artifact_dir = config.output_root / version
     artifact_dir.mkdir(parents=True, exist_ok=False)
     joblib.dump(estimator, artifact_dir / "model.bin")
     joblib.dump(scaler, artifact_dir / "scaler.bin")
+    schema_payload = {
+        "id": str(schema_record.id),
+        "version": schema_record.version,
+        "hash": schema_record.hash,
+        "features": [
+            {
+                "name": feature.name,
+                "dtype": feature.dtype,
+                "allowed_range": feature.allowed_range,
+                "description": feature.description,
+                "introduced_in_version": feature.introduced_in_version,
+                "deprecated_in_version": feature.deprecated_in_version,
+                "position": feature.position,
+            }
+            for feature in schema_record.features
+        ],
+    }
     (artifact_dir / "feature_schema.json").write_text(
-        json.dumps(
-            {"version": feature_schema.version, "features": feature_schema.features},
-            indent=2,
-        )
+        json.dumps(schema_payload, indent=2)
     )
     (artifact_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
     (artifact_dir / "training_config.json").write_text(
         json.dumps(_config_payload(config), indent=2)
     )
     (artifact_dir / "label_map.json").write_text(json.dumps(label_map, indent=2))
-    metadata = _build_metadata(config, version, dataset, label_map, feature_schema)
+    artifact_hash = hash_artifact_dir(artifact_dir, exclude_files={"metadata.json"})
+    git_commit_hash = _git_commit_hash()
+    metadata = _build_metadata(
+        config,
+        version,
+        dataset_metadata,
+        label_map,
+        feature_schema,
+        snapshot_id=snapshot_id,
+        feature_schema_hash=schema_record.hash,
+        metrics_hash=metrics_hash,
+        artifact_hash=artifact_hash,
+        git_commit_hash=git_commit_hash,
+    )
     (artifact_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
     return TrainingResult(
         version=version,
         artifact_dir=artifact_dir,
         metrics=metrics,
         label_map=label_map,
+        dataset_snapshot_id=snapshot_id,
+        feature_schema_version=feature_schema.version,
+        git_commit_hash=git_commit_hash,
+        training_seed=config.random_seed,
+        metrics_hash=metrics_hash,
+        artifact_hash=artifact_hash,
     )
 
 
@@ -96,6 +149,74 @@ def _load_dataset(dataset_dir: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(path)
     return dict(np.load(path, allow_pickle=True))
+
+
+def _resolve_feature_schema_path(config: TrainingConfig) -> Path:
+    if config.feature_schema_path:
+        return config.feature_schema_path
+    fallback = config.dataset_dir / "feature_schema.json"
+    if not fallback.exists():
+        raise FileNotFoundError(fallback)
+    return fallback
+
+
+def _resolve_snapshot_id(
+    config: TrainingConfig, dataset_metadata: dict[str, Any] | None
+) -> str:
+    snapshot_id = config.dataset_snapshot_id
+    if not snapshot_id and dataset_metadata:
+        snapshot_id = dataset_metadata.get("dataset_snapshot_id")
+    if not snapshot_id:
+        raise ValueError("Training requires a dataset snapshot reference")
+    try:
+        return str(uuid.UUID(str(snapshot_id)))
+    except ValueError as exc:
+        raise ValueError("Invalid dataset snapshot id") from exc
+
+
+def _resolve_feature_schema_record(
+    feature_schema: FeatureSchema,
+    dataset_metadata: dict[str, Any] | None,
+):
+    record = run_with_db_retry(
+        lambda session: get_feature_schema_by_version(session, feature_schema.version),
+        operation_name="training_feature_schema",
+    )
+    if record is None:
+        raise ValueError("Feature schema not registered")
+    if record.feature_names != feature_schema.features:
+        raise ValueError("Feature ordering mismatch")
+    if dataset_metadata:
+        expected_version = dataset_metadata.get("feature_schema_version")
+        if expected_version and expected_version != record.version:
+            raise ValueError("Feature schema version mismatch")
+    return record
+
+
+def _verify_snapshot_integrity(
+    snapshot_id: str,
+    schema_record,
+    feature_schema: FeatureSchema,
+    dataset_metadata: dict[str, Any] | None,
+) -> None:
+    snapshot_uuid = uuid.UUID(snapshot_id)
+
+    def _verify(session):
+        result = verify_snapshot_checksum(session, snapshot_id=snapshot_uuid)
+        if not result.matches:
+            raise ValueError("Dataset snapshot checksum mismatch")
+        return result
+
+    run_with_db_retry(
+        _verify,
+        operation_name="verify_snapshot_checksum",
+    )
+    if feature_schema.schema_hash and feature_schema.schema_hash != schema_record.hash:
+        raise ValueError("Feature schema hash mismatch")
+    if dataset_metadata:
+        stored_hash = dataset_metadata.get("feature_schema_hash")
+        if stored_hash and stored_hash != schema_record.hash:
+            raise ValueError("Dataset snapshot schema hash mismatch")
 
 
 def _prepare_features(
@@ -221,19 +342,38 @@ def _transition_matrix(values: np.ndarray, label_map: list[str]) -> np.ndarray:
 def _build_metadata(
     config: TrainingConfig,
     version: str,
-    dataset: dict[str, Any],
+    dataset_metadata: dict[str, Any] | None,
     label_map: list[str],
     feature_schema: FeatureSchema,
+    *,
+    snapshot_id: str,
+    feature_schema_hash: str,
+    metrics_hash: str,
+    artifact_hash: str,
+    git_commit_hash: str | None,
 ) -> dict[str, Any]:
     return {
         "version": version,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "random_seed": config.random_seed,
-        "dataset_snapshot": _load_dataset_metadata(config.dataset_dir),
+        "dataset_snapshot": dataset_metadata,
+        "dataset_snapshot_id": snapshot_id,
         "feature_schema_version": feature_schema.version,
+        "feature_schema_hash": feature_schema_hash,
         "model_type": config.model_type,
         "label_map": label_map,
-        "git_commit_hash": _git_commit_hash(),
+        "git_commit_hash": git_commit_hash,
+        "metrics_hash": metrics_hash,
+        "artifact_hash": artifact_hash,
+        "lineage": build_lineage_metadata(
+            dataset_snapshot_id=snapshot_id,
+            feature_schema_version=feature_schema.version,
+            feature_schema_hash=feature_schema_hash,
+            training_seed=config.random_seed,
+            git_commit_hash=git_commit_hash,
+            metrics_hash=metrics_hash,
+            artifact_hash=artifact_hash,
+        ),
     }
 
 
@@ -261,7 +401,10 @@ def _config_payload(config: TrainingConfig) -> dict[str, Any]:
     return {
         "dataset_dir": str(config.dataset_dir),
         "output_root": str(config.output_root),
-        "feature_schema_path": str(config.feature_schema_path),
+        "feature_schema_path": str(config.feature_schema_path)
+        if config.feature_schema_path
+        else None,
+        "dataset_snapshot_id": config.dataset_snapshot_id,
         "model_type": config.model_type,
         "random_seed": config.random_seed,
         "class_balance": config.class_balance,

@@ -4,6 +4,8 @@ import uuid
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -145,6 +147,7 @@ class Prediction(Base):
         ),
         Index("ix_predictions_recording_time", "recording_id", "window_end_ts"),
         Index("ix_predictions_model_version", "model_version", "window_end_ts"),
+        Index("ix_predictions_snapshot", "dataset_snapshot_id", "window_end_ts"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -162,6 +165,9 @@ class Prediction(Base):
     )
     model_version: Mapped[str] = mapped_column(String(64))
     feature_schema_version: Mapped[str] = mapped_column(String(64))
+    dataset_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dataset_snapshots.id")
+    )
     predicted_stage: Mapped[str] = mapped_column(String(8))
     ground_truth_stage: Mapped[str | None] = mapped_column(String(8))
     probabilities: Mapped[dict] = mapped_column(JSONB)
@@ -183,14 +189,137 @@ class ModelVersion(Base):
     status: Mapped[str] = mapped_column(String(32), default="training")
     metrics: Mapped[dict | None] = mapped_column(JSONB)
     feature_schema_version: Mapped[str | None] = mapped_column(String(64))
+    dataset_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dataset_snapshots.id")
+    )
+    training_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("training_runs.id")
+    )
+    git_commit_hash: Mapped[str | None] = mapped_column(String(64))
+    training_seed: Mapped[int | None] = mapped_column(Integer)
+    metrics_hash: Mapped[str | None] = mapped_column(String(128))
+    artifact_hash: Mapped[str | None] = mapped_column(String(128))
     artifact_path: Mapped[str | None] = mapped_column(String(256))
     details: Mapped[dict | None] = mapped_column(JSONB)
     promoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     promoted_by: Mapped[str | None] = mapped_column(String(128))
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class FeatureSchema(Base):
+    __tablename__ = "feature_schemas"
+    __table_args__ = (
+        UniqueConstraint("version", name="uq_feature_schemas_version"),
+        UniqueConstraint("hash", name="uq_feature_schemas_hash"),
+        Index("ix_feature_schemas_active", "is_active"),
+        Index("ix_feature_schemas_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    version: Mapped[str] = mapped_column(String(64))
+    hash: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    features: Mapped[list["FeatureSchemaFeature"]] = relationship(
+        back_populates="schema", order_by="FeatureSchemaFeature.position"
+    )
+
+
+class FeatureSchemaFeature(Base):
+    __tablename__ = "feature_schema_features"
+    __table_args__ = (
+        UniqueConstraint(
+            "feature_schema_id",
+            "name",
+            name="uq_feature_schema_features_schema_name",
+        ),
+        UniqueConstraint(
+            "feature_schema_id",
+            "position",
+            name="uq_feature_schema_features_schema_position",
+        ),
+        CheckConstraint("position >= 0", name="ck_feature_schema_features_position"),
+        Index("ix_feature_schema_features_schema", "feature_schema_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    feature_schema_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("feature_schemas.id")
+    )
+    name: Mapped[str] = mapped_column(String(128))
+    dtype: Mapped[str] = mapped_column(String(64))
+    allowed_range: Mapped[dict | None] = mapped_column(JSONB)
+    description: Mapped[str | None] = mapped_column(Text)
+    introduced_in_version: Mapped[str | None] = mapped_column(String(64))
+    deprecated_in_version: Mapped[str | None] = mapped_column(String(64))
+    position: Mapped[int] = mapped_column(Integer)
+
+    schema: Mapped["FeatureSchema"] = relationship(back_populates="features")
+
+
+class DatasetSnapshot(Base):
+    __tablename__ = "dataset_snapshots"
+    __table_args__ = (
+        UniqueConstraint("checksum", name="uq_dataset_snapshots_checksum"),
+        CheckConstraint("row_count >= 0", name="ck_dataset_snapshots_row_count"),
+        Index("ix_dataset_snapshots_feature_schema", "feature_schema_version"),
+        Index("ix_dataset_snapshots_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(128))
+    feature_schema_version: Mapped[str] = mapped_column(String(64))
+    date_range_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    date_range_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    recording_filter: Mapped[dict | None] = mapped_column(JSONB)
+    label_source: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    checksum: Mapped[str] = mapped_column(String(128))
+    row_count: Mapped[int] = mapped_column(Integer)
+
+    windows: Mapped[list["DatasetSnapshotWindow"]] = relationship(
+        back_populates="snapshot", order_by="DatasetSnapshotWindow.window_order"
+    )
+
+
+class DatasetSnapshotWindow(Base):
+    __tablename__ = "dataset_snapshot_windows"
+    __table_args__ = (
+        CheckConstraint("window_order >= 0", name="ck_dataset_snapshot_windows_order"),
+        Index("ix_dataset_snapshot_windows_snapshot", "dataset_snapshot_id"),
+        Index("ix_dataset_snapshot_windows_window", "recording_id", "window_end_ts"),
+    )
+
+    dataset_snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("dataset_snapshots.id"),
+        primary_key=True,
+    )
+    window_order: Mapped[int] = mapped_column(Integer, primary_key=True)
+    recording_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recordings.id")
+    )
+    window_end_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    label_value: Mapped[str | None] = mapped_column(String(64))
+    label_source: Mapped[str | None] = mapped_column(String(32))
+
+    snapshot: Mapped["DatasetSnapshot"] = relationship(back_populates="windows")
 
 
 class Experiment(Base):
