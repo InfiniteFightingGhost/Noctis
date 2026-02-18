@@ -1,0 +1,53 @@
+{
+  "recordingId": "rec_1281",
+  "dateLocal": "2026-02-18",
+  "bedtimeLocal": "2026-02-17T22:48:00-05:00",
+  "waketimeLocal": "2026-02-18T06:41:00-05:00",
+  "score": 84,
+  "scoreLabel": "Good",
+  "totals": {
+    "totalSleepMin": 443,
+    "timeInBedMin": 473,
+    "sleepEfficiencyPct": 94
+  },
+  "stages": {
+    "bins": [
+      { "startMinFromBedtime": 0, "durationMin": 18, "stage": "awake" },
+      { "startMinFromBedtime": 18, "durationMin": 74, "stage": "light" },
+      { "startMinFromBedtime": 92, "durationMin": 58, "stage": "deep" },
+      { "startMinFromBedtime": 150, "durationMin": 76, "stage": "light" },
+      { "startMinFromBedtime": 226, "durationMin": 40, "stage": "rem" },
+      { "startMinFromBedtime": 266, "durationMin": 84, "stage": "light" },
+      { "startMinFromBedtime": 350, "durationMin": 35, "stage": "deep" },
+      { "startMinFromBedtime": 385, "durationMin": 58, "stage": "rem" },
+      { "startMinFromBedtime": 443, "durationMin": 30, "stage": "awake" }
+    ],
+    "pct": {
+      "awake": 6,
+      "light": 52,
+      "deep": 18,
+      "rem": 24
+    }
+  },
+  "metrics": {
+    "deepPct": 18,
+    "avgHrBpm": 58,
+    "avgRrBrpm": 14,
+    "movementPct": 9
+  },
+  "insight": {
+    "text": "Your deep sleep climbed after a consistent bedtime. Aim to start wind-down 20 minutes earlier tonight.",
+    "tag": "Consistency",
+    "confidence": 0.82
+  },
+  "primaryAction": {
+    "label": "Improve Tonight",
+    "action": "open_improve",
+    "params": { "surface": "morning" }
+  },
+  "dataQuality": {
+    "status": "ok",
+    "issues": [],
+    "lastSyncAtLocal": "2026-02-18T07:42:00-05:00"
+  }
+}
