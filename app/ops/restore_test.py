@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -42,6 +43,45 @@ def _parse_db_url(database_url: str) -> DbInfo:
     )
 
 
+def _resolve_compose_command(project_root: Path) -> list[str] | None:
+    compose_file = project_root / "docker-compose.yml"
+    if not compose_file.exists():
+        return None
+
+    candidates = (["docker", "compose"], ["docker-compose"])
+    for base in candidates:
+        if shutil.which(base[0]) is None:
+            continue
+        try:
+            subprocess.run(
+                base + ["version"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            continue
+        command = base + [
+            "-f",
+            str(compose_file),
+            "--project-directory",
+            str(project_root),
+        ]
+        try:
+            result = subprocess.run(
+                command + ["ps", "-q", "timescaledb"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            continue
+        if result.stdout.strip():
+            return command
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate backup restore")
     parser.add_argument("backup_path", help="Path to backup file")
@@ -55,10 +95,6 @@ def main() -> None:
     db = _parse_db_url(settings.database_url)
     temp_db = f"{db.database}_restore_test_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
 
-    env = os.environ.copy()
-    if db.password:
-        env["PGPASSWORD"] = db.password
-
     with psycopg.connect(
         host=db.host,
         port=db.port,
@@ -70,19 +106,46 @@ def main() -> None:
         conn.execute(f"CREATE DATABASE {temp_db}")
 
     try:
-        restore_cmd = [
-            "pg_restore",
-            "-h",
-            db.host,
-            "-p",
-            str(db.port),
-            "-U",
-            db.user,
-            "-d",
-            temp_db,
-            str(backup_path),
-        ]
-        subprocess.run(restore_cmd, check=True, env=env)
+        project_root = Path(__file__).resolve().parents[2]
+        compose_command = _resolve_compose_command(project_root)
+
+        if compose_command:
+            exec_command = compose_command + ["exec", "-T"]
+            if db.password:
+                exec_command += ["-e", f"PGPASSWORD={db.password}"]
+            exec_command += ["-e", "PGOPTIONS=-c timescaledb.restoring=on"]
+            restore_cmd = exec_command + [
+                "timescaledb",
+                "pg_restore",
+                "-h",
+                db.host,
+                "-p",
+                str(db.port),
+                "-U",
+                db.user,
+                "-d",
+                temp_db,
+            ]
+            with backup_path.open("rb") as handle:
+                subprocess.run(restore_cmd, check=True, stdin=handle)
+        else:
+            env = os.environ.copy()
+            if db.password:
+                env["PGPASSWORD"] = db.password
+            env["PGOPTIONS"] = "-c timescaledb.restoring=on"
+            restore_cmd = [
+                "pg_restore",
+                "-h",
+                db.host,
+                "-p",
+                str(db.port),
+                "-U",
+                db.user,
+                "-d",
+                temp_db,
+                str(backup_path),
+            ]
+            subprocess.run(restore_cmd, check=True, env=env)
 
         original_stats = _collect_stats(db)
         restored_stats = _collect_stats(

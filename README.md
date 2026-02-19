@@ -25,6 +25,40 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
+## Extractor (H5 -> JSONL/NPZ)
+The `extractor/` package provides a CLI that reads sleep-recording `.h5` files and exports:
+- Per-epoch JSONL with the exact 16-feature schema.
+- Optional windowized tensors (length 21, stride configurable) as `.npz`.
+
+CLI example:
+```
+extract-h5 --input /path/to/recordings --out /tmp/extract --export-windows
+```
+
+JSONL line example:
+```
+{"recording_id":"abc123","epoch_index":0,"stage":2,"features":{"in_bed_pct":100,"hr_mean":62,"hr_std":4,"dhr":-1,"rr_mean":15,"rr_std":2,"drr":-1,"large_move_pct":3,"minor_move_pct":12,"turnovers_delta":255,"apnea_delta":255,"flags":51,"vib_move_pct":255,"vib_resp_q":255,"agree_flags":255}}
+```
+
+Feature order (used for NPZ export, saved to `feature_order.json`):
+```
+in_bed_pct, hr_mean, hr_std, dhr, rr_mean, rr_std, drr, large_move_pct, minor_move_pct,
+turnovers_delta, apnea_delta, flags, vib_move_pct, vib_resp_q, agree_flags
+```
+
+Flags bitfield (uint8):
+- bit0: epoch_valid (hypnogram exists + at least one primary signal present for epoch)
+- bit1: has_ecg_features
+- bit2: has_resp_features
+- bit3: has_move_features
+- bit4: has_vib_features
+- bit5: stage_known (mapped into 0..4)
+- bits6-7: reserved
+
+Sentinels:
+- uint8 features use 255 for unknown
+- int8 deltas use -1 for unknown
+
 ## Multi-Tenant Model
 - Every request is scoped by `tenant_id` in the JWT claims.
 - Tenants are stored in `tenants` with `active`/`suspended` status.

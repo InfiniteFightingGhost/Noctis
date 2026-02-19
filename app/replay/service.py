@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.settings import get_settings
 from app.db.models import Epoch, ModelVersion, Prediction
 from app.evaluation.stats import stage_distribution, transition_matrix
+from app.feature_store.service import get_feature_schema_by_version
 from app.ml.feature_decode import decode_features
 from app.ml.feature_schema import load_feature_schema
 from app.ml.model import load_model
@@ -69,6 +70,12 @@ def _fetch_epochs(
     schema_version = rows[0][2]
     if schema_version != feature_schema.version:
         raise ValueError("Feature schema mismatch for replay")
+    schema_id = getattr(feature_schema, "schema_id", None)
+    if schema_id is None:
+        record = get_feature_schema_by_version(session, feature_schema.version)
+        if record is None:
+            raise ValueError("Feature schema not registered")
+        schema_id = record.id
     epochs: list[WindowedEpoch] = []
     for epoch_index, epoch_start_ts, _, payload in rows:
         payload_features = (
@@ -82,6 +89,7 @@ def _fetch_epochs(
                 epoch_index=epoch_index,
                 epoch_start_ts=epoch_start_ts,
                 features=vector,
+                feature_schema_id=schema_id,
             )
         )
     return epochs

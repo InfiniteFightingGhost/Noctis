@@ -5,10 +5,12 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from threading import Lock
+from functools import lru_cache
 from typing import Callable, TypeVar
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import DBAPIError, OperationalError, SQLAlchemyError
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.metrics import DB_CIRCUIT_OPEN, DB_COMMIT_LATENCY, DB_RETRY_COUNT
@@ -18,20 +20,38 @@ from app.utils.errors import CircuitBreakerOpenError
 from app.core.settings import get_settings
 
 
-def get_engine():
-    settings = get_settings()
+@lru_cache
+def _get_engine_cached(database_url: str, pool_size: int, max_overflow: int) -> Engine:
     return create_engine(
-        settings.database_url,
-        pool_size=settings.db_pool_size,
-        max_overflow=settings.db_max_overflow,
+        database_url,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
         pool_pre_ping=True,
     )
 
 
-ENGINE = get_engine()
-SessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=ENGINE, expire_on_commit=False
-)
+@lru_cache
+def _get_sessionmaker(database_url: str, pool_size: int, max_overflow: int):
+    engine = _get_engine_cached(database_url, pool_size, max_overflow)
+    return sessionmaker(
+        autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
+    )
+
+
+def get_engine() -> Engine:
+    settings = get_settings()
+    return _get_engine_cached(
+        settings.database_url, settings.db_pool_size, settings.db_max_overflow
+    )
+
+
+def SessionLocal() -> Session:
+    settings = get_settings()
+    maker = _get_sessionmaker(
+        settings.database_url, settings.db_pool_size, settings.db_max_overflow
+    )
+    return maker()
+
 
 T = TypeVar("T")
 

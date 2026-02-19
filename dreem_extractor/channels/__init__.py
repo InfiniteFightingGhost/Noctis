@@ -1,0 +1,1 @@
+"""Channel resolution and normalization."""

@@ -37,7 +37,8 @@ class DatasetFilters:
 @dataclass(frozen=True)
 class DatasetBuildConfig:
     output_dir: Path
-    feature_schema_path: Path
+    feature_schema_path: Path | None
+    feature_schema_version: str | None = None
     window_size: int = 21
     allow_padding: bool = False
     label_strategy: str = "ground_truth_or_predicted"
@@ -62,6 +63,10 @@ def load_dataset_config(path: Path) -> DatasetBuildConfig:
 def dataset_config_from_payload(payload: dict[str, Any]) -> DatasetBuildConfig:
     filters = payload.get("filters", {}) if isinstance(payload, dict) else {}
     split_payload = payload.get("split", {}) if isinstance(payload, dict) else {}
+    feature_schema_path = payload.get("feature_schema_path")
+    feature_schema_version = payload.get("feature_schema_version")
+    if not feature_schema_path and not feature_schema_version:
+        raise ValueError("feature_schema_path or feature_schema_version required")
     split = DatasetSplitConfig(
         train=float(split_payload.get("train", 0.7)),
         val=float(split_payload.get("val", 0.15)),
@@ -70,7 +75,8 @@ def dataset_config_from_payload(payload: dict[str, Any]) -> DatasetBuildConfig:
     split.validate()
     config = DatasetBuildConfig(
         output_dir=Path(payload["output_dir"]),
-        feature_schema_path=Path(payload["feature_schema_path"]),
+        feature_schema_path=Path(feature_schema_path) if feature_schema_path else None,
+        feature_schema_version=feature_schema_version,
         window_size=int(payload.get("window_size", 21)),
         allow_padding=bool(payload.get("allow_padding", False)),
         label_strategy=str(payload.get("label_strategy", "ground_truth_or_predicted")),
