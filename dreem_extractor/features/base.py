@@ -22,6 +22,7 @@ class FeatureOutput:
     flags: np.ndarray | None = None
     agree_flags: np.ndarray | None = None
     warnings: list[str] | None = None
+    qc: dict[str, float] | None = None
 
 
 class FeaturePlugin:

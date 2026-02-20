@@ -55,6 +55,7 @@ def extract_record(path: str | Path, config: ExtractConfig) -> ExtractResult:
     features = _init_feature_arrays(n_epochs)
     flags = np.zeros(n_epochs, dtype=np.uint8)
     agree_flags = np.zeros(n_epochs, dtype=np.uint8)
+    qc_metrics: dict[str, float] = {}
 
     for plugin in _select_plugins(signals):
         output = plugin.compute(ctx)
@@ -66,6 +67,8 @@ def extract_record(path: str | Path, config: ExtractConfig) -> ExtractResult:
             agree_flags |= output.agree_flags
         if output.warnings:
             warnings.extend(output.warnings)
+        if output.qc:
+            qc_metrics.update(output.qc)
 
     if "ecg" in manifest.channel_map:
         flags |= 1 << FlagBits.ECG_PRESENT
@@ -105,7 +108,7 @@ def extract_record(path: str | Path, config: ExtractConfig) -> ExtractResult:
         qc={},
         warnings=warnings,
     )
-    result.qc = compute_qc(result, manifest)
+    result.qc = compute_qc(result, manifest, config=config, extra_metrics=qc_metrics)
     return result
 
 

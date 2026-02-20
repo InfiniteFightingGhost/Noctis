@@ -40,6 +40,11 @@ class ExtractConfig:
     resp_band_high: float = 0.5
     ecg_band_low: float = 0.5
     ecg_band_high: float = 40.0
+    hr_gap_fill_max_epochs: int = 2
+    hr_median_window: int = 5
+    hr_jump_max_delta: float = 15.0
+    hr_smooth_alpha: float = 0.3
+    hr_smooth_window: int = 0
 
 
 def clamp_uint8(value: float) -> int:
