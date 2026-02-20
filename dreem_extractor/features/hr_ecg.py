@@ -32,8 +32,8 @@ class ECGHRPlugin(FeaturePlugin):
             ctx.config.thresholds.ecg_band_hz[0],
             ctx.config.thresholds.ecg_band_hz[1],
         )
-        threshold = np.median(filtered) + 1.5 * mad(filtered)
-        peaks = detect_peaks(filtered, ecg.fs, min_distance_sec=0.3, height=threshold)
+        threshold = np.median(filtered) + 3.0 * mad(filtered)
+        peaks = detect_peaks(filtered, ecg.fs, min_distance_sec=0.25, height=threshold)
         if peaks.size < 2:
             return FeatureOutput(
                 features={"hr_mean": hr_mean, "hr_std": hr_std, "dhr": dhr},
@@ -41,30 +41,39 @@ class ECGHRPlugin(FeaturePlugin):
             )
 
         peak_times = peaks / ecg.fs
-        rr_intervals = np.diff(peak_times)
-        valid_mask = (rr_intervals >= 0.3) & (rr_intervals <= 2.5)
-        if not np.any(valid_mask):
+        rr_intervals_all = np.diff(peak_times)
+        rr_times_all = peak_times[1:]
+        if rr_intervals_all.size == 0:
             return FeatureOutput(
                 features={"hr_mean": hr_mean, "hr_std": hr_std, "dhr": dhr},
                 flags=flags,
             )
-        rr_intervals = rr_intervals[valid_mask]
+        rr_min_sec = ctx.config.thresholds.ecg_rr_min_sec
+        rr_max_sec = ctx.config.thresholds.ecg_rr_max_sec
+        valid_mask = (rr_intervals_all >= rr_min_sec) & (rr_intervals_all <= rr_max_sec)
+        rr_intervals = rr_intervals_all[valid_mask]
         hr_values = 60.0 / rr_intervals
-        hr_times = (peak_times[1:])[valid_mask]
+        hr_times = rr_times_all[valid_mask]
 
         min_hr, max_hr = ctx.config.thresholds.hr_range_bpm
         min_beats = ctx.config.thresholds.min_beats_per_epoch
+        ecg_sqi_thresh = ctx.config.thresholds.ecg_sqi_thresh
 
         samples_per_epoch = int(round(ecg.fs * ctx.config.epoch_sec))
         for i in range(n_epochs):
             start_t = (i * samples_per_epoch) / ecg.fs
             end_t = ((i + 1) * samples_per_epoch) / ecg.fs
+            rr_mask = (rr_times_all >= start_t) & (rr_times_all < end_t)
+            total_rr = int(np.sum(rr_mask))
+            valid_rr = int(np.sum(rr_mask & valid_mask))
+            ecg_sqi = valid_rr / total_rr if total_rr else 0.0
+            beat_count = int(np.sum((peak_times >= start_t) & (peak_times < end_t)))
+            if beat_count < min_beats or ecg_sqi < ecg_sqi_thresh:
+                continue
             mask = (hr_times >= start_t) & (hr_times < end_t)
             if not np.any(mask):
                 continue
             values = hr_values[mask]
-            if values.size < min_beats:
-                continue
             mean_val = float(np.mean(values))
             if mean_val < min_hr or mean_val > max_hr:
                 continue
@@ -72,14 +81,178 @@ class ECGHRPlugin(FeaturePlugin):
             hr_std[i] = int(round(min(255, max(0, float(np.std(values))))))
             flags[i] |= 1 << FlagBits.HR_VALID
 
+        hr_values = _to_nan(hr_mean)
+        hr_values = _post_process_hr(hr_values, ctx.config.thresholds)
+        hr_jump_rate, hr_delta_p95 = _compute_delta_metrics(
+            hr_values,
+            ctx.config.thresholds.hr_jump_max_delta,
+        )
+        hr_values = _smooth_hr(
+            hr_values,
+            ctx.config.thresholds.hr_smooth_alpha,
+            ctx.config.thresholds.hr_smooth_window,
+        )
+        _, hr_smooth_delta_p95 = _compute_delta_metrics(
+            hr_values,
+            ctx.config.thresholds.hr_jump_max_delta,
+        )
+        hr_mean = _from_float_to_uint8(hr_values)
+
         for i in range(1, n_epochs):
-            if hr_mean[i] == UINT8_UNKNOWN or hr_mean[i - 1] == UINT8_UNKNOWN:
+            if np.isnan(hr_values[i]) or np.isnan(hr_values[i - 1]):
                 dhr[i] = INT8_UNKNOWN
             else:
-                delta = int(hr_mean[i]) - int(hr_mean[i - 1])
+                delta = int(round(hr_values[i] - hr_values[i - 1]))
                 dhr[i] = int(max(-128, min(127, delta)))
 
         return FeatureOutput(
             features={"hr_mean": hr_mean, "hr_std": hr_std, "dhr": dhr},
             flags=flags,
+            qc={
+                "hr_jump_rate": hr_jump_rate,
+                "hr_delta_p95": hr_delta_p95,
+                "hr_smooth_delta_p95": hr_smooth_delta_p95,
+            },
         )
+
+
+def _to_nan(values: np.ndarray) -> np.ndarray:
+    out = values.astype(float)
+    out[values == UINT8_UNKNOWN] = np.nan
+    return out
+
+
+def _from_float_to_uint8(values: np.ndarray) -> np.ndarray:
+    out = np.full(values.shape, UINT8_UNKNOWN, dtype=np.uint8)
+    mask = ~np.isnan(values)
+    if np.any(mask):
+        out[mask] = np.clip(np.round(values[mask]), 0, 255).astype(np.uint8)
+    return out
+
+
+def _post_process_hr(values: np.ndarray, thresholds) -> np.ndarray:
+    out = _fill_short_nan_runs(values, thresholds.hr_gap_fill_max_epochs)
+    out = _rolling_median(out, thresholds.hr_median_window)
+    out = _cap_delta(out, thresholds.hr_jump_max_delta)
+    return out
+
+
+def _fill_short_nan_runs(values: np.ndarray, max_gap: int) -> np.ndarray:
+    if max_gap <= 0:
+        return values
+    out = values.copy()
+    idx = 0
+    n = len(out)
+    while idx < n:
+        if not np.isnan(out[idx]):
+            idx += 1
+            continue
+        start = idx
+        while idx < n and np.isnan(out[idx]):
+            idx += 1
+        end = idx - 1
+        gap_len = end - start + 1
+        prev_idx = start - 1
+        next_idx = idx if idx < n else None
+        if (
+            gap_len <= max_gap
+            and prev_idx >= 0
+            and next_idx is not None
+            and not np.isnan(out[prev_idx])
+            and not np.isnan(out[next_idx])
+        ):
+            fill = np.linspace(out[prev_idx], out[next_idx], gap_len + 2)[1:-1]
+            out[start:idx] = fill
+    return out
+
+
+def _rolling_median(values: np.ndarray, window: int) -> np.ndarray:
+    if window <= 1:
+        return values
+    if window % 2 == 0:
+        window += 1
+    out = values.copy()
+    half = window // 2
+    n = len(out)
+    for i in range(n):
+        if np.isnan(out[i]):
+            continue
+        start = max(0, i - half)
+        end = min(n, i + half + 1)
+        median_val = np.nanmedian(out[start:end])
+        if not np.isnan(median_val):
+            out[i] = median_val
+    return out
+
+
+def _cap_delta(values: np.ndarray, max_delta: float) -> np.ndarray:
+    if max_delta <= 0:
+        return values
+    out = values.copy()
+    prev = None
+    for i in range(len(out)):
+        if np.isnan(out[i]):
+            prev = None
+            continue
+        if prev is None:
+            prev = float(out[i])
+            continue
+        delta = float(out[i]) - prev
+        if abs(delta) > max_delta:
+            out[i] = prev + np.sign(delta) * max_delta
+        prev = float(out[i])
+    return out
+
+
+def _smooth_hr(values: np.ndarray, alpha: float, window: int) -> np.ndarray:
+    out = values.copy()
+    if alpha > 0:
+        prev = None
+        for i in range(len(out)):
+            if np.isnan(out[i]):
+                prev = None
+                continue
+            if prev is None:
+                prev = float(out[i])
+                continue
+            out[i] = alpha * float(out[i]) + (1.0 - alpha) * prev
+            prev = float(out[i])
+    if window <= 1:
+        return out
+    if window % 2 == 0:
+        window += 1
+    smoothed = out.copy()
+    half = window // 2
+    n = len(out)
+    for i in range(n):
+        if np.isnan(out[i]):
+            continue
+        start = max(0, i - half)
+        end = min(n, i + half + 1)
+        segment = out[start:end]
+        if np.all(np.isnan(segment)):
+            continue
+        smoothed[i] = float(np.nanmean(segment))
+    return smoothed
+
+
+def _compute_delta_metrics(values: np.ndarray, max_delta: float) -> tuple[float, float]:
+    deltas: list[float] = []
+    jumps = 0
+    prev = None
+    for value in values:
+        if np.isnan(value):
+            prev = None
+            continue
+        if prev is None:
+            prev = float(value)
+            continue
+        delta = abs(float(value) - prev)
+        deltas.append(delta)
+        if max_delta > 0 and delta > max_delta:
+            jumps += 1
+        prev = float(value)
+    if not deltas:
+        return 0.0, float("nan")
+    jump_rate = jumps / len(deltas) if deltas else 0.0
+    return jump_rate, float(np.percentile(np.array(deltas, dtype=float), 95))
