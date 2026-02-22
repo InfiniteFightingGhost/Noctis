@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import joblib
 import numpy as np
@@ -19,7 +19,7 @@ class ModelArtifacts:
 def load_artifacts(model_dir: Path) -> ModelArtifacts:
     weights = np.load(model_dir / "weights.npy")
     bias = np.load(model_dir / "bias.npy")
-    label_map = json.loads((model_dir / "label_map.json").read_text())
+    label_map = cast(list[str], json.loads((model_dir / "label_map.json").read_text()))
     return ModelArtifacts(weights=weights, bias=bias, label_map=label_map)
 
 
@@ -49,8 +49,8 @@ class LinearSoftmaxModel(BaseModelAdapter):
         return self._label_map
 
     def predict_proba(self, batch: np.ndarray) -> np.ndarray:
-        if batch.ndim == 3:
-            batch = batch.mean(axis=1)
+        if batch.ndim != 2:
+            raise ValueError("Model expects 2D feature batch")
         logits = batch @ self._weights + self._bias
         logits = logits - np.max(logits, axis=-1, keepdims=True)
         exp_logits = np.exp(logits)
@@ -68,8 +68,8 @@ class SklearnModelAdapter(BaseModelAdapter):
         return self._label_map
 
     def predict_proba(self, batch: np.ndarray) -> np.ndarray:
-        if batch.ndim == 3:
-            batch = batch.mean(axis=1)
+        if batch.ndim != 2:
+            raise ValueError("Model expects 2D feature batch")
         if self._scaler is not None:
             batch = self._scaler.transform(batch)
         return self._model.predict_proba(batch)
@@ -81,7 +81,12 @@ class SklearnModelAdapter(BaseModelAdapter):
 
 def load_model(model_dir: Path) -> ModelBundle:
     metadata_path = model_dir / "metadata.json"
-    metadata = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
+    metadata = (
+        cast(dict[str, Any], json.loads(metadata_path.read_text()))
+        if metadata_path.exists()
+        else {}
+    )
+    adapter: BaseModelAdapter
     if (model_dir / "model.bin").exists():
         model = joblib.load(model_dir / "model.bin")
         scaler = None
@@ -89,9 +94,12 @@ def load_model(model_dir: Path) -> ModelBundle:
             scaler = joblib.load(model_dir / "scaler.bin")
         label_map_path = model_dir / "label_map.json"
         if label_map_path.exists():
-            label_map = json.loads(label_map_path.read_text())
+            label_map = cast(list[str], json.loads(label_map_path.read_text()))
         else:
-            label_map = metadata.get("label_map", [])
+            label_map = cast(list[str], metadata.get("label_map", []))
+        model_labels = [str(label) for label in getattr(model, "classes_", [])]
+        if model_labels and label_map and model_labels != label_map:
+            raise ValueError("Model label_map ordering mismatch")
         adapter = SklearnModelAdapter(model=model, scaler=scaler, label_map=label_map)
         return ModelBundle(model=adapter, metadata=metadata)
     artifacts = load_artifacts(model_dir)

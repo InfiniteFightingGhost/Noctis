@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import Counter
-from math import log
+from math import isfinite, log
+from typing import cast
 
 
 def build_labels(y_true: list[str], y_pred: list[str]) -> list[str]:
@@ -9,9 +10,14 @@ def build_labels(y_true: list[str], y_pred: list[str]) -> list[str]:
     return labels
 
 
-def confusion_matrix(
-    y_true: list[str], y_pred: list[str], labels: list[str]
-) -> list[list[int]]:
+def merge_labels(base: list[str], extra: list[str]) -> list[str]:
+    merged = list(base)
+    missing = sorted(set(extra) - set(merged))
+    merged.extend(missing)
+    return merged
+
+
+def confusion_matrix(y_true: list[str], y_pred: list[str], labels: list[str]) -> list[list[int]]:
     index = {label: i for i, label in enumerate(labels)}
     size = len(labels)
     matrix = [[0 for _ in range(size)] for _ in range(size)]
@@ -22,8 +28,8 @@ def confusion_matrix(
 
 def per_class_metrics(
     matrix: list[list[int]], labels: list[str]
-) -> list[dict[str, object]]:
-    metrics: list[dict[str, object]] = []
+) -> list[dict[str, float | int | str]]:
+    metrics: list[dict[str, float | int | str]] = []
     size = len(labels)
     for i, label in enumerate(labels):
         tp = matrix[i][i]
@@ -53,7 +59,7 @@ def accuracy(matrix: list[list[int]]) -> float:
     return correct / total if total > 0 else 0.0
 
 
-def macro_f1(metrics: list[dict[str, object]]) -> float:
+def macro_f1(metrics: list[dict[str, float | int | str]]) -> float:
     if not metrics:
         return 0.0
     return sum(float(item["f1"]) for item in metrics) / len(metrics)
@@ -69,11 +75,15 @@ def transition_matrix(stages: list[str], labels: list[str]) -> list[list[int]]:
     return matrix
 
 
-def confidence_histogram(confidences: list[float], bins: int = 10) -> dict[str, list]:
+def confidence_histogram(
+    confidences: list[float], bins: int = 10
+) -> dict[str, list[float] | list[int]]:
     if bins <= 0:
         raise ValueError("bins must be positive")
     counts = [0 for _ in range(bins)]
     for value in confidences:
+        if not isfinite(value):
+            continue
         idx = min(bins - 1, max(0, int(value * bins)))
         counts[idx] += 1
     edges = [i / bins for i in range(bins + 1)]
@@ -85,6 +95,8 @@ def entropy_metrics(probabilities: list[dict[str, float]]) -> dict[str, float]:
     for row in probabilities:
         entropy = 0.0
         for value in row.values():
+            if not isfinite(value):
+                continue
             if value > 0:
                 entropy -= value * log(value)
         entropies.append(entropy)
@@ -109,9 +121,10 @@ def stage_distribution(stages: list[str]) -> dict[str, float]:
 
 
 def average_confidence(confidences: list[float]) -> float:
-    if not confidences:
+    values = [value for value in confidences if isfinite(value)]
+    if not values:
         return 0.0
-    return sum(confidences) / len(confidences)
+    return sum(values) / len(values)
 
 
 def per_class_frequency(stages: list[str]) -> list[dict[str, object]]:
@@ -129,9 +142,7 @@ def prediction_distribution(stages: list[str]) -> dict[str, float]:
     return stage_distribution(stages)
 
 
-def night_summary_metrics(
-    stages: list[str], epoch_minutes: float = 0.5
-) -> dict[str, object]:
+def night_summary_metrics(stages: list[str], epoch_minutes: float = 0.5) -> dict[str, object]:
     total_minutes = len(stages) * epoch_minutes
     sleep_minutes = sum(1 for stage in stages if stage != "W") * epoch_minutes
     sleep_efficiency = (sleep_minutes / total_minutes) if total_minutes > 0 else 0.0
@@ -142,9 +153,7 @@ def night_summary_metrics(
         try:
             onset_index = next(i for i, stage in enumerate(stages) if stage != "W")
             sleep_latency = onset_index * epoch_minutes
-            waso = (
-                sum(1 for stage in stages[onset_index:] if stage == "W") * epoch_minutes
-            )
+            waso = sum(1 for stage in stages[onset_index:] if stage == "W") * epoch_minutes
         except StopIteration:
             sleep_latency = None
             waso = None
@@ -179,20 +188,18 @@ def night_summary_delta(
     ]:
         pred_val = predicted.get(key)
         truth_val = ground_truth.get(key)
-        if not isinstance(pred_val, (int, float)) or not isinstance(
-            truth_val, (int, float)
-        ):
+        if not isinstance(pred_val, (int, float)) or not isinstance(truth_val, (int, float)):
             delta[key] = None
         else:
             delta[key] = float(pred_val) - float(truth_val)
 
-    delta_stage = {}
-    pred_stage = predicted.get("stage_proportions")
-    truth_stage = ground_truth.get("stage_proportions")
-    if not isinstance(pred_stage, dict):
-        pred_stage = {}
-    if not isinstance(truth_stage, dict):
-        truth_stage = {}
+    delta_stage: dict[str, float] = {}
+    pred_stage_raw = predicted.get("stage_proportions")
+    truth_stage_raw = ground_truth.get("stage_proportions")
+    pred_stage = cast(dict[str, float], pred_stage_raw) if isinstance(pred_stage_raw, dict) else {}
+    truth_stage = (
+        cast(dict[str, float], truth_stage_raw) if isinstance(truth_stage_raw, dict) else {}
+    )
     for stage in set(pred_stage) | set(truth_stage):
         delta_stage[stage] = float(pred_stage.get(stage, 0.0) or 0.0) - float(
             truth_stage.get(stage, 0.0) or 0.0

@@ -28,19 +28,31 @@ async def stress_run(
     model = registry.get_loaded()
     settings = get_settings()
     if payload.mode not in {"ingest", "inference", "both"}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid stress mode"
-        )
-    window_size = (
-        payload.window_size or model.metadata.get("window_size") or settings.window_size
-    )
-    result: dict[str, object] = {}
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid stress mode")
+    window_size = payload.window_size or model.metadata.get("window_size") or settings.window_size
+    iterations: int | None = None
+    batch_size: int | None = None
+    window_size_value: int | None = None
+    duration_seconds: float | None = None
+    avg_latency_ms: float | None = None
+    p95_latency_ms: float | None = None
+    throughput_per_sec: float | None = None
+    device_count: int | None = None
+    recording_count: int | None = None
+    epoch_count: int | None = None
+    ingest_duration_seconds: float | None = None
+    ingest_throughput_per_sec: float | None = None
 
     if payload.mode in {"ingest", "both"}:
         schema = run_with_db_retry(
             lambda session: get_active_feature_schema(session),
             operation_name="stress_feature_schema",
         )
+        if schema is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Active feature schema not found",
+            )
         ingest_result = await run_ingest_stress(
             model,
             feature_schema_version=schema.version,
@@ -53,53 +65,46 @@ async def stress_run(
                 tenant_id=tenant.id,
             ),
         )
-        result.update(
-            {
-                "device_count": ingest_result["device_count"],
-                "recording_count": ingest_result["recording_count"],
-                "epoch_count": ingest_result["epoch_count"],
-                "ingest_duration_seconds": ingest_result["duration_seconds"],
-                "ingest_throughput_per_sec": ingest_result["throughput_per_sec"],
-            }
-        )
+        device_count = int(ingest_result["device_count"])
+        recording_count = int(ingest_result["recording_count"])
+        epoch_count = int(ingest_result["epoch_count"])
+        ingest_duration_seconds = float(ingest_result["duration_seconds"])
+        ingest_throughput_per_sec = float(ingest_result["throughput_per_sec"])
 
     if payload.mode in {"inference", "both"}:
         inference_result = await anyio.to_thread.run_sync(
-            run_inference_stress,
-            model,
-            iterations=payload.iterations,
-            batch_size=payload.batch_size,
-            window_size=int(window_size),
-            seed=payload.seed,
+            lambda: run_inference_stress(
+                model,
+                iterations=payload.iterations,
+                batch_size=payload.batch_size,
+                window_size=int(window_size),
+                seed=payload.seed,
+            )
         )
-        result.update(
-            {
-                "iterations": payload.iterations,
-                "batch_size": payload.batch_size,
-                "window_size": int(window_size),
-                "duration_seconds": inference_result["duration_seconds"],
-                "avg_latency_ms": inference_result["avg_latency_ms"],
-                "p95_latency_ms": inference_result["p95_latency_ms"],
-                "throughput_per_sec": inference_result["throughput_per_sec"],
-            }
-        )
+        iterations = payload.iterations
+        batch_size = payload.batch_size
+        window_size_value = int(window_size)
+        duration_seconds = float(inference_result["duration_seconds"])
+        avg_latency_ms = float(inference_result["avg_latency_ms"])
+        p95_latency_ms = float(inference_result["p95_latency_ms"])
+        throughput_per_sec = float(inference_result["throughput_per_sec"])
     memory_mb = memory_rss_mb()
     MEMORY_RSS_MB.set(memory_mb)
     STRESS_RUNS.inc()
     return StressRunResponse(
         mode=payload.mode,
         seed=payload.seed,
-        iterations=result.get("iterations"),
-        batch_size=result.get("batch_size"),
-        window_size=result.get("window_size"),
-        duration_seconds=result.get("duration_seconds"),
-        avg_latency_ms=result.get("avg_latency_ms"),
-        p95_latency_ms=result.get("p95_latency_ms"),
-        throughput_per_sec=result.get("throughput_per_sec"),
+        iterations=iterations,
+        batch_size=batch_size,
+        window_size=window_size_value,
+        duration_seconds=duration_seconds,
+        avg_latency_ms=avg_latency_ms,
+        p95_latency_ms=p95_latency_ms,
+        throughput_per_sec=throughput_per_sec,
         memory_rss_mb=memory_mb,
-        device_count=result.get("device_count"),
-        recording_count=result.get("recording_count"),
-        epoch_count=result.get("epoch_count"),
-        ingest_duration_seconds=result.get("ingest_duration_seconds"),
-        ingest_throughput_per_sec=result.get("ingest_throughput_per_sec"),
+        device_count=device_count,
+        recording_count=recording_count,
+        epoch_count=epoch_count,
+        ingest_duration_seconds=ingest_duration_seconds,
+        ingest_throughput_per_sec=ingest_throughput_per_sec,
     )

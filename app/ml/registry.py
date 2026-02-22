@@ -51,8 +51,12 @@ class ModelRegistry:
                     )
                     if computed_hash != expected_hash:
                         raise ValueError("Model artifact hash mismatch")
+                feature_strategy = bundle.metadata.get("feature_strategy")
+                expected_input_dim = bundle.metadata.get("expected_input_dim")
+                if feature_strategy is None or expected_input_dim is None:
+                    raise ValueError("Model feature strategy metadata missing")
                 expected = getattr(bundle.model, "n_features_in_", None)
-                if expected is not None and int(expected) != feature_schema.size:
+                if expected is not None and int(expected) != int(expected_input_dim):
                     raise ValueError("Model feature size mismatch")
                 if self._schema_provider is not None:
                     active_schema = self._schema_provider()

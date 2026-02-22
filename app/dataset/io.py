@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -26,9 +26,9 @@ def save_npz(
         window_end_ts=window_end_ts,
         recording_ids=recording_ids,
         label_map=np.asarray(label_map),
-        split_train=splits.get("train"),
-        split_val=splits.get("val"),
-        split_test=splits.get("test"),
+        split_train=cast(np.ndarray, splits.get("train")),
+        split_val=cast(np.ndarray, splits.get("val")),
+        split_test=cast(np.ndarray, splits.get("test")),
     )
     (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
 

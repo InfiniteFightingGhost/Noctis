@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from functools import lru_cache
-from typing import Callable, TypeVar
+from typing import Callable, Iterator, TypeVar, cast
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import DBAPIError, OperationalError, SQLAlchemyError
@@ -31,11 +31,9 @@ def _get_engine_cached(database_url: str, pool_size: int, max_overflow: int) -> 
 
 
 @lru_cache
-def _get_sessionmaker(database_url: str, pool_size: int, max_overflow: int):
+def _get_sessionmaker(database_url: str, pool_size: int, max_overflow: int) -> sessionmaker:
     engine = _get_engine_cached(database_url, pool_size, max_overflow)
-    return sessionmaker(
-        autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
-    )
+    return sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 
 
 def get_engine() -> Engine:
@@ -118,7 +116,7 @@ def get_circuit_breaker() -> DbCircuitBreaker:
 def _is_transient_db_error(exc: BaseException) -> bool:
     if isinstance(exc, OperationalError):
         return True
-    if isinstance(exc, DBAPIError) and exc.connection_invalidated:
+    if isinstance(exc, DBAPIError) and getattr(exc, "connection_invalidated", False):
         return True
     return False
 
@@ -148,7 +146,7 @@ def run_with_db_retry(
         session = SessionLocal()
         try:
             if get_fault("db_down"):
-                raise OperationalError("fault injected", None, None)
+                raise OperationalError("fault injected", None, cast(BaseException, None))
             result = operation(session)
             if commit:
                 commit_start = time.perf_counter()
@@ -176,7 +174,7 @@ def run_with_db_retry(
     raise RuntimeError("DB retry failed without exception")
 
 
-def get_db():
+def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:
         yield db

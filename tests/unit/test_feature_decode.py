@@ -27,3 +27,14 @@ def test_decode_features_base64() -> None:
     payload = base64.b64encode(raw).decode("utf-8")
     vector = decode_features(payload, schema)
     assert vector.tolist() == [1.0, 2.0, 3.0]
+
+
+def test_decode_features_rejects_nan() -> None:
+    schema = FeatureSchema(version="v1", features=["a", "b", "c"])
+    payload = [1.0, float("nan"), 3.0]
+    try:
+        decode_features(payload, schema)
+    except ValueError as exc:
+        assert "NaN" in str(exc) or "nan" in str(exc)
+    else:
+        raise AssertionError("Expected decode_features to raise")

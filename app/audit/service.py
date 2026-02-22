@@ -22,16 +22,12 @@ class AuditIssue:
 def run_audit(session: Session, *, tenant_id: uuid.UUID) -> list[AuditIssue]:
     settings = get_settings()
     schema = get_active_feature_schema(session)
+    if schema is None:
+        raise ValueError("Active feature schema not found")
     issues: list[AuditIssue] = []
-    issues.extend(
-        _check_missing_epochs(session, tenant_id, settings.audit_max_report_rows)
-    )
-    issues.extend(
-        _check_window_gaps(session, tenant_id, settings.audit_epoch_gap_seconds)
-    )
-    issues.extend(
-        _check_orphan_predictions(session, tenant_id, settings.audit_max_report_rows)
-    )
+    issues.extend(_check_missing_epochs(session, tenant_id, settings.audit_max_report_rows))
+    issues.extend(_check_window_gaps(session, tenant_id, settings.audit_epoch_gap_seconds))
+    issues.extend(_check_orphan_predictions(session, tenant_id, settings.audit_max_report_rows))
     issues.extend(
         _check_invalid_feature_schema(
             session,
@@ -53,9 +49,7 @@ def run_audit(session: Session, *, tenant_id: uuid.UUID) -> list[AuditIssue]:
     return issues
 
 
-def _check_missing_epochs(
-    session: Session, tenant_id: uuid.UUID, limit: int
-) -> list[AuditIssue]:
+def _check_missing_epochs(session: Session, tenant_id: uuid.UUID, limit: int) -> list[AuditIssue]:
     rows = (
         session.query(
             Epoch.recording_id,
@@ -124,8 +118,7 @@ def _check_orphan_predictions(
         session.query(Prediction.recording_id)
         .outerjoin(
             Recording,
-            (Prediction.recording_id == Recording.id)
-            & (Recording.tenant_id == tenant_id),
+            (Prediction.recording_id == Recording.id) & (Recording.tenant_id == tenant_id),
         )
         .filter(Prediction.tenant_id == tenant_id)
         .filter(Recording.id.is_(None))

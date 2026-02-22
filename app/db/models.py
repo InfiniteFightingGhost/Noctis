@@ -564,3 +564,84 @@ class AuditLog(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class Alarm(Base):
+    __tablename__ = "alarms"
+    __table_args__ = (
+        Index("ix_alarms_tenant", "tenant_id"),
+        Index("ix_alarms_tenant_scheduled", "tenant_id", "scheduled_for"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    name: Mapped[str] = mapped_column(String(128))
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class Routine(Base):
+    __tablename__ = "routines"
+    __table_args__ = (
+        Index("ix_routines_tenant", "tenant_id"),
+        Index("ix_routines_tenant_status", "tenant_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    name: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class Challenge(Base):
+    __tablename__ = "challenges"
+    __table_args__ = (
+        CheckConstraint("progress >= 0.0 AND progress <= 1.0", name="ck_challenges_progress"),
+        Index("ix_challenges_tenant", "tenant_id"),
+        Index("ix_challenges_tenant_status", "tenant_id", "status"),
+        Index("ix_challenges_tenant_window", "tenant_id", "starts_at", "ends_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    name: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    progress: Mapped[float] = mapped_column(Float, default=0.0)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class SearchIndexEntry(Base):
+    __tablename__ = "search_index_entries"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "entity_type",
+            "entity_id",
+            name="uq_search_index_entries_entity",
+        ),
+        Index("ix_search_index_entries_tenant", "tenant_id"),
+        Index("ix_search_index_entries_tenant_type", "tenant_id", "entity_type"),
+        Index("ix_search_index_entries_entity", "entity_type", "entity_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    entity_type: Mapped[str] = mapped_column(String(64))
+    entity_id: Mapped[str] = mapped_column(String(128))
+    title: Mapped[str] = mapped_column(String(200))
+    subtitle: Mapped[str | None] = mapped_column(Text)
+    search_text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )

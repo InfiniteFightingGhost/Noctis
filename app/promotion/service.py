@@ -30,9 +30,7 @@ def promote_model(
     if current_prod:
         previous_status = current_prod.status
         _update_status(session, current_prod, "archived", actor, reason)
-        _record_event(
-            session, current_prod.version, previous_status, "archived", actor, reason
-        )
+        _record_event(session, current_prod.version, previous_status, "archived", actor, reason)
     previous_status = model.status
     _update_status(session, model, "production", actor, reason)
     _record_event(session, model.version, previous_status, "production", actor, reason)
@@ -69,9 +67,7 @@ def rollback_model(
     if current_prod:
         previous_status = current_prod.status
         _update_status(session, current_prod, "archived", actor, reason)
-        _record_event(
-            session, current_prod.version, previous_status, "archived", actor, reason
-        )
+        _record_event(session, current_prod.version, previous_status, "archived", actor, reason)
     previous_status = model.status
     _update_status(session, model, "production", actor, reason)
     _record_event(session, model.version, previous_status, "production", actor, reason)
@@ -158,6 +154,8 @@ def _activate_model_artifacts(model: ModelVersion) -> None:
     settings = get_settings()
     root = settings.model_registry_path
     root.mkdir(parents=True, exist_ok=True)
+    if not model.artifact_path:
+        raise ValueError("Model artifact path missing")
     source = Path(model.artifact_path)
     if not source.exists():
         raise ValueError("Model artifacts not found")
@@ -174,5 +172,7 @@ def _activate_model_artifacts(model: ModelVersion) -> None:
 
 def _assert_schema_compatibility(session: Session, model: ModelVersion) -> None:
     active_schema = get_active_feature_schema(session)
+    if active_schema is None:
+        raise ValueError("Active feature schema not found")
     if model.feature_schema_version != active_schema.version:
         raise ValueError("Model feature schema mismatch with active schema")

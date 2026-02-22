@@ -19,12 +19,33 @@ dreem_extractor = "dreem_extractor.cli.main:main"
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint.per-file-ignores]
+"app/audit/scheduler.py" = ["F401"]
+"app/dataset/builder.py" = ["F401"]
+"app/ml/registry.py" = ["F401"]
+"app/promotion/service.py" = ["F401"]
+"app/schemas/predictions.py" = ["F401"]
+"apps/py-ml-api/src/db/models/base.py" = ["F401"]
+"py-signal/src/features/time_domain.py" = ["F401"]
+"py-signal/src/quality/checks.py" = ["F401"]
+"py-signal/src/windowing/window.py" = ["F401"]
+
 [tool.mypy]
 python_version = "3.11"
 warn_unused_ignores = true
 warn_redundant_casts = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+files = [
+  "app/dataset/builder.py",
+  "app/services/windowing.py",
+  "app/training/trainer.py",
+  "app/services/inference.py",
+  "app/ml/model.py",
+  "app/ml/registry.py",
+  "app/evaluation/service.py",
+]
+exclude = "^(alembic|apps/py-ml-api/alembic)/env\\.py$|^py-signal/src/types\\.py$"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

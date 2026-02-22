@@ -36,7 +36,7 @@ def enqueue_retrain_job(
 
 
 def fetch_pending_jobs(session: Session, limit: int) -> list[RetrainJob]:
-    return (
+    return list(
         session.execute(
             select(RetrainJob)
             .where(RetrainJob.status == "pending")

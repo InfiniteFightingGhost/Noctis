@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     feature_schema_version: str = "v1"
     window_size: int = 21
     allow_window_padding: bool = False
+    epoch_seconds: int = 30
 
     metrics_enabled: bool = True
 

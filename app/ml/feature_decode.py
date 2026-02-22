@@ -25,9 +25,9 @@ def decode_features(payload: Any, schema: FeatureSchema | Any) -> np.ndarray:
         raise ValueError("Unsupported feature payload")
 
     if vector.shape[0] != len(feature_names):
-        raise ValueError(
-            f"Expected {len(feature_names)} features, got {vector.shape[0]}"
-        )
+        raise ValueError(f"Expected {len(feature_names)} features, got {vector.shape[0]}")
+    if not np.isfinite(vector).all():
+        raise ValueError("Decoded features contain NaN or Inf")
     return vector
 
 
