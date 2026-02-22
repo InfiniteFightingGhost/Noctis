@@ -1,0 +1,31 @@
+[project]
+name = "noctis-extractor"
+version = "0.1.0"
+description = "Sleep recording .h5 feature extractor and CLI"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy",
+  "h5py",
+  "scipy",
+  "pyyaml",
+]
+
+[project.scripts]
+extract-h5 = "extractor.cli:main"
+dreem_extractor = "dreem_extractor.cli.main:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

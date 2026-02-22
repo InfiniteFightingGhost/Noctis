@@ -1,0 +1,20 @@
+{
+  "record_id": "0d79f4b1-e74f-5e87-8e42-f9dd7112ada5",
+  "missing_channels": [
+    "resp"
+  ],
+  "hr_valid_pct": 0.0,
+  "rr_valid_pct": 0.0,
+  "rr_source": "none",
+  "alignment_warnings": [],
+  "hr_summary": {
+    "min": NaN,
+    "max": NaN,
+    "median": NaN
+  },
+  "rr_summary": {
+    "min": NaN,
+    "max": NaN,
+    "median": NaN
+  }
+}

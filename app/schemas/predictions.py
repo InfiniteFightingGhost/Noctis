@@ -37,6 +37,7 @@ class PredictionResponse(BaseSchema):
     window_end_ts: datetime
     model_version: str
     feature_schema_version: str
+    dataset_snapshot_id: uuid.UUID | None = None
     predicted_stage: str
     ground_truth_stage: str | None = None
     confidence: float

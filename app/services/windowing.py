@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import uuid
 
 import numpy as np
 
@@ -11,6 +12,7 @@ class WindowedEpoch:
     epoch_index: int
     epoch_start_ts: datetime
     features: np.ndarray
+    feature_schema_id: uuid.UUID
 
 
 @dataclass(frozen=True)
@@ -18,6 +20,7 @@ class Window:
     start_ts: datetime
     end_ts: datetime
     tensor: np.ndarray
+    feature_schema_id: uuid.UUID
 
 
 def build_windows(
@@ -28,6 +31,9 @@ def build_windows(
     if not epochs:
         return []
     ordered = sorted(epochs, key=lambda e: e.epoch_index)
+    schema_id = ordered[0].feature_schema_id
+    if any(epoch.feature_schema_id != schema_id for epoch in ordered):
+        raise ValueError("Cross-schema window mixing is not allowed")
     windows: list[Window] = []
     for idx in range(len(ordered)):
         start = idx - window_size + 1
@@ -50,6 +56,7 @@ def build_windows(
                 start_ts=slice_epochs[0].epoch_start_ts,
                 end_ts=slice_epochs[-1].epoch_start_ts,
                 tensor=tensor,
+                feature_schema_id=schema_id,
             )
         )
     return windows

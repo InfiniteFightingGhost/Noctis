@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -15,19 +16,21 @@ from app.services.windowing import WindowedEpoch
 
 
 def test_label_alignment_ground_truth() -> None:
-    label = _select_label(
+    label, source = _select_label(
         {"ground_truth_stage": "N2", "predicted_stage": "W"},
         "ground_truth_only",
     )
     assert label == "N2"
+    assert source == "ground_truth"
 
 
 def test_label_alignment_predicted_fallback() -> None:
-    label = _select_label(
+    label, source = _select_label(
         {"ground_truth_stage": None, "predicted_stage": "REM"},
         "ground_truth_or_predicted",
     )
     assert label == "REM"
+    assert source == "predicted"
 
 
 def test_stratified_split_deterministic() -> None:
@@ -45,21 +48,29 @@ def test_stratified_split_deterministic() -> None:
 
 def test_window_build_deterministic_order() -> None:
     start = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    schema_id = uuid.uuid4()
     epochs_a = [
         WindowedEpoch(
-            i, start + timedelta(seconds=30 * i), np.ones(2, dtype=np.float32)
+            i,
+            start + timedelta(seconds=30 * i),
+            np.ones(2, dtype=np.float32),
+            feature_schema_id=schema_id,
         )
         for i in range(21)
     ]
     epochs_b = [
         WindowedEpoch(
-            i, start + timedelta(seconds=30 * i), np.ones(2, dtype=np.float32) * 2
+            i,
+            start + timedelta(seconds=30 * i),
+            np.ones(2, dtype=np.float32) * 2,
+            feature_schema_id=schema_id,
         )
         for i in range(21)
     ]
     config = DatasetBuildConfig(
         output_dir=Path("."),
         feature_schema_path=Path("schema.json"),
+        feature_schema_version="v1",
         window_size=21,
     )
     windows, meta = _build_windows({"b": epochs_b, "a": epochs_a}, config)

@@ -6,14 +6,14 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db.models import ModelUsageStat, Prediction
-from app.db.session import ENGINE, get_circuit_breaker
+from app.db.session import get_circuit_breaker, get_engine
 from app.monitoring.memory import memory_rss_mb
 
 
 def build_performance_snapshot(
     session: Session, *, tenant_id, started_at: datetime, sample_size: int
 ) -> dict[str, object]:
-    pool = ENGINE.pool
+    pool = get_engine().pool
     breaker = get_circuit_breaker()
     now = datetime.now(timezone.utc)
 

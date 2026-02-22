@@ -10,6 +10,13 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
       <div class="app-header__inner">
         <span class="app-header__brand">Noctis</span>
         <nav class="app-header__nav">
+          <a
+            routerLink="/sleep-summary"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+          >
+            Morning
+          </a>
           <a routerLink="/" routerLinkActive="active" ariaCurrentWhenActive="page">
             Home
           </a>

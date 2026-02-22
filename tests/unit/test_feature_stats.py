@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import uuid
 
 import numpy as np
 
@@ -16,14 +17,19 @@ from app.services.windowing import WindowedEpoch
 
 def test_compute_daily_feature_stats() -> None:
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    schema_id = uuid.uuid4()
     epochs = [
         WindowedEpoch(
-            epoch_index=0, epoch_start_ts=start, features=np.array([1.0, 2.0])
+            epoch_index=0,
+            epoch_start_ts=start,
+            features=np.array([1.0, 2.0]),
+            feature_schema_id=schema_id,
         ),
         WindowedEpoch(
             epoch_index=1,
             epoch_start_ts=start,
             features=np.array([3.0, 4.0]),
+            feature_schema_id=schema_id,
         ),
     ]
     aggregates = compute_daily_feature_stats(epochs)
@@ -56,15 +62,25 @@ def test_merge_feature_stats() -> None:
 def test_compute_daily_feature_stats_multiple_days() -> None:
     start = datetime(2024, 1, 1, tzinfo=timezone.utc)
     next_day = datetime(2024, 1, 2, tzinfo=timezone.utc)
+    schema_id = uuid.uuid4()
     epochs = [
         WindowedEpoch(
-            epoch_index=0, epoch_start_ts=start, features=np.array([1.0, 3.0])
+            epoch_index=0,
+            epoch_start_ts=start,
+            features=np.array([1.0, 3.0]),
+            feature_schema_id=schema_id,
         ),
         WindowedEpoch(
-            epoch_index=1, epoch_start_ts=start, features=np.array([3.0, 5.0])
+            epoch_index=1,
+            epoch_start_ts=start,
+            features=np.array([3.0, 5.0]),
+            feature_schema_id=schema_id,
         ),
         WindowedEpoch(
-            epoch_index=2, epoch_start_ts=next_day, features=np.array([2.0, 4.0])
+            epoch_index=2,
+            epoch_start_ts=next_day,
+            features=np.array([2.0, 4.0]),
+            feature_schema_id=schema_id,
         ),
     ]
     aggregates = compute_daily_feature_stats(epochs)

@@ -4,8 +4,8 @@ import time
 from datetime import datetime, timezone
 
 from app.core.settings import get_settings
-from app.dataset.builder import build_dataset
-from app.dataset.config import dataset_config_from_payload
+from app.dataset.snapshot_config import snapshot_config_from_payload
+from app.dataset.snapshots import create_snapshot
 from app.db.session import run_with_db_retry
 from app.experiments.service import (
     register_model_version,
@@ -60,10 +60,11 @@ def _process_job(job_id) -> None:
     error_message = None
     try:
         dataset_payload = job.dataset_config or {}
-        dataset_config = dataset_config_from_payload(dataset_payload)
-        build_dataset(dataset_config)
+        snapshot_config = snapshot_config_from_payload(dataset_payload)
+        snapshot_result = create_snapshot(snapshot_config)
         training_payload = dict(job.training_config or {})
-        training_payload["dataset_dir"] = str(dataset_config.output_dir)
+        training_payload["dataset_dir"] = str(snapshot_config.output_dir)
+        training_payload["dataset_snapshot_id"] = str(snapshot_result.snapshot_id)
         training_config = training_config_from_payload(training_payload)
         version = run_with_db_retry(
             lambda session: next_version(
@@ -81,8 +82,13 @@ def _process_job(job_id) -> None:
                 version=result.version,
                 status="staging",
                 metrics=result.metrics,
-                feature_schema_path=training_config.feature_schema_path,
+                feature_schema_version=result.feature_schema_version,
                 artifact_path=str(result.artifact_dir),
+                dataset_snapshot_id=result.dataset_snapshot_id,
+                training_seed=result.training_seed,
+                git_commit_hash=result.git_commit_hash,
+                metrics_hash=result.metrics_hash,
+                artifact_hash=result.artifact_hash,
             )
             register_training_run(
                 session,
@@ -101,8 +107,9 @@ def _process_job(job_id) -> None:
                     },
                 },
                 dataset_dir=str(training_config.dataset_dir),
-                feature_schema_path=training_config.feature_schema_path,
+                feature_schema_version=result.feature_schema_version,
                 artifact_path=str(result.artifact_dir),
+                dataset_snapshot_id=result.dataset_snapshot_id,
             )
 
         run_with_db_retry(_register, commit=True, operation_name="register_retrain")
