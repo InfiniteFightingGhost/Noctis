@@ -20,6 +20,8 @@ def resolve_channels(
         channel_map[logical] = match
         dataset = h5file[match]
         fs = _read_fs(dataset, config.fs_attr_keys)
+        if fs is None:
+            fs = _read_fs_from_group(h5file, match, config.fs_attr_keys)
         if fs is not None:
             fs_map[logical] = fs
     return channel_map, fs_map
@@ -43,4 +45,23 @@ def _read_fs(dataset: h5py.Dataset, keys: list[str]) -> float | None:
                 return float(value)
             except (TypeError, ValueError):
                 continue
+    return None
+
+
+def _read_fs_from_group(h5file: h5py.File, dataset_path: str, keys: list[str]) -> float | None:
+    parts = dataset_path.strip("/").split("/")
+    for idx in range(len(parts) - 1, 0, -1):
+        group_path = "/" + "/".join(parts[:idx])
+        if group_path in h5file:
+            group = h5file[group_path]
+            if isinstance(group, h5py.Group):
+                for key in keys:
+                    if key in group.attrs:
+                        value = group.attrs[key]
+                        if isinstance(value, (list, tuple)):
+                            value = value[0]
+                        try:
+                            return float(value)
+                        except (TypeError, ValueError):
+                            continue
     return None
