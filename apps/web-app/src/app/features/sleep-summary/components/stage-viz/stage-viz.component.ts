@@ -1,5 +1,4 @@
 import { Component, Input, signal } from "@angular/core";
-import { NgFor, NgIf } from "@angular/common";
 import { StageBin, StagePct } from "../../api/sleep-summary.types";
 import { findStageAtMinute, mapXToMinute } from "./stage-viz.utils";
 import { STAGE_COLORS, stageLabel } from "./stage-colors";
@@ -7,7 +6,6 @@ import { STAGE_COLORS, stageLabel } from "./stage-colors";
 @Component({
   selector: "app-stage-viz",
   standalone: true,
-  imports: [NgFor, NgIf],
   template: `
     <section class="sleep-summary__stage">
       <div class="stage-viz__bar">
@@ -93,11 +91,13 @@ export class StageVizComponent {
     const rect = target.getBoundingClientRect();
     const offset = event.clientX - rect.left;
     const minute = mapXToMinute(offset, rect.width, this.timeInBedMin);
-    const stage = findStageAtMinute(this.bins, minute);
+    const bin = findStageAtMinute(this.bins, minute);
     const timeLabel = this.formatTimeAtMinute(minute);
 
-    if (stage) {
-      this.tooltip.set(`${timeLabel} - ${stageLabel(stage)}`);
+    if (bin) {
+      this.tooltip.set(
+        `${timeLabel} - ${stageLabel(bin.stage)} (${bin.durationMin}m)`,
+      );
     }
   }
 

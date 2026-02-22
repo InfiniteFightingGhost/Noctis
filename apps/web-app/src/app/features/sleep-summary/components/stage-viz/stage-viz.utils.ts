@@ -1,5 +1,5 @@
 import { clamp } from "../../../../core/utils/clamp";
-import { StageBin, SleepStage } from "../../api/sleep-summary.types";
+import { StageBin } from "../../api/sleep-summary.types";
 
 export const mapXToMinute = (
   x: number,
@@ -18,11 +18,11 @@ export const mapXToMinute = (
 export const findStageAtMinute = (
   bins: StageBin[],
   minute: number,
-): SleepStage | null => {
+): StageBin | null => {
   const match = bins.find(
     (bin) => minute >= bin.startMinFromBedtime &&
       minute < bin.startMinFromBedtime + bin.durationMin,
   );
 
-  return match?.stage ?? null;
+  return match ?? null;
 };

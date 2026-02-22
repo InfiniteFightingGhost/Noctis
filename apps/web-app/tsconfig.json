@@ -8,5 +8,9 @@
     "skipLibCheck": true,
     "types": ["vitest/globals"]
   },
+  "angularCompilerOptions": {
+    "strictTemplates": true,
+    "strictInjectionParameters": true
+  },
   "include": ["src/**/*.ts"]
 }

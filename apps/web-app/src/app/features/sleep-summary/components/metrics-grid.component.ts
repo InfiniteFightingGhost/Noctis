@@ -10,25 +10,25 @@ import { formatMinutesAsClock, formatPct } from "../../../core/utils/format";
       <div class="metrics-grid__card">
         <div class="metrics-grid__label">Total Sleep</div>
         <div class="metrics-grid__value">
-          {{ formatMinutesAsClock(summary?.totals.totalSleepMin) }}
+          {{ formatMinutesAsClock(summary?.totals?.totalSleepMin) }}
         </div>
       </div>
       <div class="metrics-grid__card">
         <div class="metrics-grid__label">Deep %</div>
         <div class="metrics-grid__value">
-          {{ formatPct(summary?.metrics.deepPct) }}
+          {{ formatPct(summary?.metrics?.deepPct) }}
         </div>
       </div>
       <div class="metrics-grid__card">
         <div class="metrics-grid__label">Avg HR</div>
         <div class="metrics-grid__value">
-          {{ summary?.metrics.avgHrBpm ?? "--" }} bpm
+          {{ summary?.metrics?.avgHrBpm ?? "--" }} bpm
         </div>
       </div>
       <div class="metrics-grid__card">
         <div class="metrics-grid__label">Movement %</div>
         <div class="metrics-grid__value">
-          {{ formatPct(summary?.metrics.movementPct) }}
+          {{ formatPct(summary?.metrics?.movementPct) }}
         </div>
       </div>
     </div>

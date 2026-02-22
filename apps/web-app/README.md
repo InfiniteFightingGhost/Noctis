@@ -11,6 +11,16 @@ npm install
 npm test
 ```
 
+## Development server
+Run the Angular dev server:
+
+```bash
+npm install
+npm start
+```
+
+Then open http://localhost:4200.
+
 ## Environment
 Set values in a local `.env` file if needed.
 

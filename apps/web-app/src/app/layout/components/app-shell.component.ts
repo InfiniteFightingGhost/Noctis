@@ -37,6 +37,17 @@ export class AppShellComponent {
   }
 
   private updateHeader(url: string): void {
-    this.showHeader.set(!url.startsWith("/sleep-summary"));
+    const hiddenPrefixes = [
+      "/dashboard",
+      "/report",
+      "/coach",
+      "/alarm",
+      "/routine",
+      "/challenges",
+      "/device",
+      "/sleep-summary",
+    ];
+
+    this.showHeader.set(!hiddenPrefixes.some((prefix) => url.startsWith(prefix)));
   }
 }

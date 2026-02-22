@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject } from "@angular/core";
-import { Router } from "@angular/router";
+import { Router, RouterLink } from "@angular/router";
 import { SleepSummaryStore } from "../data/sleep-summary.store";
 import { MorningHeaderComponent } from "../components/morning-header.component";
 import { ScoreCardComponent } from "../components/score-card.component";
@@ -9,6 +9,7 @@ import { InsightCardComponent } from "../components/insight-card.component";
 import { LoadingStateComponent } from "../components/states/loading-state.component";
 import { NoDataStateComponent } from "../components/states/no-data-state.component";
 import { SyncErrorStateComponent } from "../components/states/sync-error-state.component";
+import { StatusBannerComponent } from "../../../shared/ui/status-banner/status-banner.component";
 
 @Component({
   selector: "app-sleep-summary-page",
@@ -22,6 +23,8 @@ import { SyncErrorStateComponent } from "../components/states/sync-error-state.c
     LoadingStateComponent,
     NoDataStateComponent,
     SyncErrorStateComponent,
+    StatusBannerComponent,
+    RouterLink,
   ],
   template: `
     <section class="sleep-summary sleep-summary-theme">
@@ -47,31 +50,45 @@ import { SyncErrorStateComponent } from "../components/states/sync-error-state.c
           />
         }
         @default {
-          <div class="sleep-summary__content">
-            <app-morning-header
-              [dateLocal]="summary()?.dateLocal ?? ''"
-              [syncStatus]="syncStatus()"
-              [lastSyncAtLocal]="summary()?.dataQuality.lastSyncAtLocal ?? null"
-            />
-            <app-score-card [summary]="summary()" />
-            <app-stage-viz
-              [bins]="summary()?.stages.bins ?? []"
-              [pct]="summary()?.stages.pct ?? defaultPct"
-              [timeInBedMin]="summary()?.totals.timeInBedMin ?? 0"
-              [bedtimeLocal]="summary()?.bedtimeLocal ?? ''"
-            />
-            <app-metrics-grid [summary]="summary()" />
-            <app-insight-card [summary]="summary()" />
-            <div class="sleep-summary__cta">
-              <button
-                class="sleep-summary__button"
-                type="button"
-                (click)="handlePrimaryAction()"
-              >
-                {{ store.primaryActionLabel() }}
-              </button>
+          @if (summary(); as sleepSummary) {
+            <div class="sleep-summary__content">
+              @if (isPartial()) {
+                <ui-status-banner
+                  variant="partial"
+                  title="Partial data"
+                  message="Some sensors dropped; accuracy reduced."
+                  actionLabel="Details"
+                  (action)="openDetails()"
+                />
+              }
+              <app-morning-header
+                [dateLocal]="sleepSummary.dateLocal"
+                [syncStatus]="syncStatus()"
+                [lastSyncAtLocal]="sleepSummary.dataQuality.lastSyncAtLocal ?? null"
+              />
+              <app-score-card [summary]="sleepSummary" />
+              <app-stage-viz
+                [bins]="sleepSummary.stages.bins"
+                [pct]="sleepSummary.stages.pct"
+                [timeInBedMin]="sleepSummary.totals.timeInBedMin"
+                [bedtimeLocal]="sleepSummary.bedtimeLocal"
+              />
+              <app-metrics-grid [summary]="sleepSummary" />
+              <app-insight-card [summary]="sleepSummary" />
+              <div class="sleep-summary__cta">
+                <button
+                  class="sleep-summary__button"
+                  type="button"
+                  (click)="handlePrimaryAction()"
+                >
+                  {{ store.primaryActionLabel() }}
+                </button>
+                <a class="primary-link" routerLink="/report">
+                  View Full Analysis
+                </a>
+              </div>
             </div>
-          </div>
+          }
         }
       }
     </section>
@@ -92,6 +109,10 @@ export class SleepSummaryPageComponent implements OnInit {
     return null;
   });
 
+  readonly isPartial = computed(
+    () => this.summary()?.dataQuality.status === "partial",
+  );
+
   ngOnInit(): void {
     void this.store.loadLatest();
   }
@@ -108,15 +129,19 @@ export class SleepSummaryPageComponent implements OnInit {
     }
 
     if (action === "open_improve") {
-      void this.router.navigateByUrl("/sleep-summary/improve");
+      void this.router.navigateByUrl("/coach");
       return;
     }
 
     if (action === "open_analysis") {
-      void this.router.navigateByUrl("/sleep-summary/analysis");
+      void this.router.navigateByUrl("/report");
       return;
     }
 
-    void this.router.navigateByUrl("/sleep-summary");
+    void this.router.navigateByUrl("/coach");
+  }
+
+  openDetails(): void {
+    void this.router.navigateByUrl("/device");
   }
 }
