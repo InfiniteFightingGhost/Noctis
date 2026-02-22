@@ -23,13 +23,13 @@
 
 // --- PIN DEFINITIONS ---
 #define PIN_SPI_SCK    18
-#define PIN_SPI_MISO   19
+#define PIN_SPI_MISO   5
 #define PIN_SPI_MOSI   23
-#define PIN_FLASH_CS   17
+#define PIN_FLASH_CS   19
 #define PIN_I2C_SDA    2
 #define PIN_I2C_SCL    15
-#define PIN_C1001_RX   26
-#define PIN_C1001_TX   27
+#define PIN_C1001_RX   27
+#define PIN_C1001_TX   26
 #define LED_STATUS_PIN 32
 
 // --- FLASH LAYOUT ---

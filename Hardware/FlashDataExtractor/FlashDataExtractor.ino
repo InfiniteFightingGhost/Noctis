@@ -6,10 +6,10 @@
 #include <SPI.h>
 #include <SPIMemory.h>
 
-#define PIN_SPI_SCK  18
-#define PIN_SPI_MISO 19
-#define PIN_SPI_MOSI 23
-#define PIN_FLASH_CS 17
+#define PIN_SPI_SCK    18
+#define PIN_SPI_MISO   5
+#define PIN_SPI_MOSI   23
+#define PIN_FLASH_CS   19
 
 #define METADATA_ADDR   0x1000   // Must match recording firmware
 #define DATA_START_ADDR 0x2000   // Must match recording firmware
