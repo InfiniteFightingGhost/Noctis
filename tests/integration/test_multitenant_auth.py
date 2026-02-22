@@ -46,32 +46,31 @@ async def test_multitenant_isolation_and_auth() -> None:
 
     app = create_app()
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        device = (
-            await client.post(
-                "/v1/devices",
-                json={"name": "device-1"},
-                headers=build_auth_header(tenant_a),
-            )
-        ).json()
-        recording = (
-            await client.post(
-                "/v1/recordings",
-                json={
-                    "device_id": device["id"],
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                },
-                headers=build_auth_header(tenant_a),
-            )
-        ).json()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            device = (
+                await client.post(
+                    "/v1/devices",
+                    json={"name": "device-1"},
+                    headers=build_auth_header(tenant_a),
+                )
+            ).json()
+            recording = (
+                await client.post(
+                    "/v1/recordings",
+                    json={
+                        "device_id": device["id"],
+                        "started_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    headers=build_auth_header(tenant_a),
+                )
+            ).json()
 
-        cross_tenant = await client.get(
-            f"/v1/recordings/{recording['id']}",
-            headers=build_auth_header(tenant_b),
-        )
-        assert cross_tenant.status_code == 404
+            cross_tenant = await client.get(
+                f"/v1/recordings/{recording['id']}",
+                headers=build_auth_header(tenant_b),
+            )
+            assert cross_tenant.status_code == 404
 
-        missing_auth = await client.post("/v1/devices", json={"name": "device-2"})
-        assert missing_auth.status_code == 401
+            missing_auth = await client.post("/v1/devices", json={"name": "device-2"})
+            assert missing_auth.status_code == 401

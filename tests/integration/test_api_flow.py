@@ -35,70 +35,69 @@ async def test_ingest_predict_flow() -> None:
     ingest_headers = build_auth_header(ingest_client)
     read_headers = build_auth_header(read_client)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        device = (
-            await client.post(
-                "/v1/devices",
-                json={"name": "device-1"},
-                headers=ingest_headers,
-            )
-        ).json()
-        recording = (
-            await client.post(
-                "/v1/recordings",
-                json={
-                    "device_id": device["id"],
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                },
-                headers=ingest_headers,
-            )
-        ).json()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            device = (
+                await client.post(
+                    "/v1/devices",
+                    json={"name": "device-1"},
+                    headers=ingest_headers,
+                )
+            ).json()
+            recording = (
+                await client.post(
+                    "/v1/recordings",
+                    json={
+                        "device_id": device["id"],
+                        "started_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    headers=ingest_headers,
+                )
+            ).json()
 
-        start = datetime.now(timezone.utc)
-        epochs = []
-        for i in range(21):
-            epochs.append(
-                {
-                    "epoch_index": i,
-                    "epoch_start_ts": (start + timedelta(seconds=30 * i)).isoformat(),
-                    "feature_schema_version": "v1",
-                    "features": [0.1] * 10,
-                }
-            )
+            start = datetime.now(timezone.utc)
+            epochs = []
+            for i in range(21):
+                epochs.append(
+                    {
+                        "epoch_index": i,
+                        "epoch_start_ts": (start + timedelta(seconds=30 * i)).isoformat(),
+                        "feature_schema_version": "v1",
+                        "features": [0.1] * 10,
+                    }
+                )
 
-        ingest = (
-            await client.post(
-                "/v1/epochs:ingest",
-                headers=ingest_headers,
-                json={"recording_id": recording["id"], "epochs": epochs},
-            )
-        ).json()
-        assert ingest["inserted"] == 21
+            ingest = (
+                await client.post(
+                    "/v1/epochs:ingest",
+                    headers=ingest_headers,
+                    json={"recording_id": recording["id"], "epochs": epochs},
+                )
+            ).json()
+            assert ingest["inserted"] == 21
 
-        predict = (
-            await client.post(
-                "/v1/predict",
-                headers=read_headers,
-                json={"recording_id": recording["id"]},
-            )
-        ).json()
-        assert predict["model_version"] == "active"
-        assert len(predict["predictions"]) == 1
+            predict = (
+                await client.post(
+                    "/v1/predict",
+                    headers=read_headers,
+                    json={"recording_id": recording["id"]},
+                )
+            ).json()
+            assert predict["model_version"] == "active"
+            assert len(predict["predictions"]) == 1
 
-        evaluation = (
-            await client.get(
-                f"/v1/recordings/{recording['id']}/evaluation",
-                headers=read_headers,
-                params={
-                    "from": start.isoformat(),
-                    "to": (start + timedelta(minutes=10)).isoformat(),
-                },
-            )
-        ).json()
-        assert evaluation["scope"] == "recording"
-        assert evaluation["total_predictions"] >= 1
+            evaluation = (
+                await client.get(
+                    f"/v1/recordings/{recording['id']}/evaluation",
+                    headers=read_headers,
+                    params={
+                        "from": start.isoformat(),
+                        "to": (start + timedelta(minutes=11)).isoformat(),
+                    },
+                )
+            ).json()
+            assert evaluation["scope"] == "recording"
+            assert evaluation["total_predictions"] >= 1
 
-        drift = (await client.get("/v1/model/drift", headers=read_headers)).json()
-        assert "metrics" in drift
+            drift = (await client.get("/v1/model/drift", headers=read_headers)).json()
+            assert "metrics" in drift

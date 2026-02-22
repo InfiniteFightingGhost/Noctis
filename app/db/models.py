@@ -28,9 +28,7 @@ class Tenant(Base):
     __tablename__ = "tenants"
     __table_args__ = (UniqueConstraint("name", name="uq_tenants_name"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200))
     status: Mapped[str] = mapped_column(String(32), default="active")
     created_at: Mapped[datetime] = mapped_column(
@@ -38,18 +36,36 @@ class Tenant(Base):
     )
 
 
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "external_id", name="uq_users_tenant_external"),
+        Index("ix_users_tenant", "tenant_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    name: Mapped[str] = mapped_column(String(200))
+    external_id: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    devices: Mapped[list["Device"]] = relationship(back_populates="user")
+
+
 class Device(Base):
     __tablename__ = "devices"
     __table_args__ = (
         UniqueConstraint("tenant_id", "external_id", name="uq_devices_tenant_external"),
         Index("ix_devices_tenant", "tenant_id"),
+        Index("ix_devices_tenant_user", "tenant_id", "user_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     name: Mapped[str] = mapped_column(String(200))
     external_id: Mapped[str | None] = mapped_column(String(200))
@@ -58,6 +74,7 @@ class Device(Base):
     )
 
     recordings: Mapped[list["Recording"]] = relationship(back_populates="device")
+    user: Mapped["User | None"] = relationship(back_populates="devices")
 
 
 class Recording(Base):
@@ -67,15 +84,9 @@ class Recording(Base):
         Index("ix_recordings_tenant", "tenant_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
-    device_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("devices.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("devices.id"))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     timezone: Mapped[str | None] = mapped_column(String(64))
@@ -108,9 +119,7 @@ class Epoch(Base):
         Index("ix_epochs_recording_index", "recording_id", "epoch_index"),
     )
 
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     recording_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("recordings.id"), primary_key=True
     )
@@ -127,12 +136,43 @@ class Epoch(Base):
     recording: Mapped["Recording"] = relationship(back_populates="epochs")
 
 
+class DeviceEpochRaw(Base):
+    __tablename__ = "device_epoch_raw"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "recording_id",
+            "epoch_start_ts",
+            name="uq_device_epoch_raw_recording_ts",
+        ),
+        Index(
+            "ix_device_epoch_raw_tenant_recording",
+            "tenant_id",
+            "recording_id",
+        ),
+        Index(
+            "ix_device_epoch_raw_tenant_device",
+            "tenant_id",
+            "device_id",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("devices.id"))
+    recording_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("recordings.id"))
+    epoch_index: Mapped[int] = mapped_column(Integer)
+    epoch_start_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    raw_metrics: Mapped[dict] = mapped_column(JSONB)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
 class Prediction(Base):
     __tablename__ = "predictions"
     __table_args__ = (
-        UniqueConstraint(
-            "recording_id", "window_end_ts", name="uq_prediction_window_end"
-        ),
+        UniqueConstraint("recording_id", "window_end_ts", name="uq_prediction_window_end"),
         Index(
             "ix_predictions_tenant_recording_time",
             "tenant_id",
@@ -150,15 +190,9 @@ class Prediction(Base):
         Index("ix_predictions_snapshot", "dataset_snapshot_id", "window_end_ts"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
-    recording_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("recordings.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    recording_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("recordings.id"))
     window_start_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     window_end_ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), index=True, primary_key=True
@@ -182,9 +216,7 @@ class Prediction(Base):
 class ModelVersion(Base):
     __tablename__ = "model_versions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     version: Mapped[str] = mapped_column(String(64), unique=True)
     status: Mapped[str] = mapped_column(String(32), default="training")
     metrics: Mapped[dict | None] = mapped_column(JSONB)
@@ -219,9 +251,7 @@ class FeatureSchema(Base):
         Index("ix_feature_schemas_created_at", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     version: Mapped[str] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(128))
     description: Mapped[str | None] = mapped_column(Text)
@@ -252,9 +282,7 @@ class FeatureSchemaFeature(Base):
         Index("ix_feature_schema_features_schema", "feature_schema_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     feature_schema_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("feature_schemas.id")
     )
@@ -278,9 +306,7 @@ class DatasetSnapshot(Base):
         Index("ix_dataset_snapshots_created_at", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(128))
     feature_schema_version: Mapped[str] = mapped_column(String(64))
     date_range_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -312,9 +338,7 @@ class DatasetSnapshotWindow(Base):
         primary_key=True,
     )
     window_order: Mapped[int] = mapped_column(Integer, primary_key=True)
-    recording_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("recordings.id")
-    )
+    recording_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("recordings.id"))
     window_end_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     label_value: Mapped[str | None] = mapped_column(String(64))
     label_source: Mapped[str | None] = mapped_column(String(32))
@@ -329,12 +353,8 @@ class Experiment(Base):
         Index("ix_experiments_tenant", "tenant_id"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     name: Mapped[str] = mapped_column(String(128))
     description: Mapped[str | None] = mapped_column(String(256))
     created_at: Mapped[datetime] = mapped_column(
@@ -346,9 +366,7 @@ class TrainingRun(Base):
     __tablename__ = "training_runs"
     __table_args__ = (Index("ix_training_runs_model", "model_version", "created_at"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     experiment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     model_version: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32))
@@ -368,9 +386,7 @@ class TrainingRun(Base):
 class ModelPromotionEvent(Base):
     __tablename__ = "model_promotion_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     model_version: Mapped[str] = mapped_column(String(64))
     previous_status: Mapped[str | None] = mapped_column(String(32))
     new_status: Mapped[str] = mapped_column(String(32))
@@ -388,12 +404,8 @@ class RetrainJob(Base):
         Index("ix_retrain_jobs_tenant_status", "tenant_id", "status", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     status: Mapped[str] = mapped_column(String(32), default="pending")
     drift_score: Mapped[float] = mapped_column(Float)
     triggering_features: Mapped[dict | None] = mapped_column(JSONB)
@@ -418,12 +430,8 @@ class EvaluationMetric(Base):
         Index("ix_evaluation_metrics_tenant", "tenant_id", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     model_version: Mapped[str] = mapped_column(String(64))
     recording_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     from_ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -446,12 +454,8 @@ class ModelUsageStat(Base):
         ),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     model_version: Mapped[str] = mapped_column(String(64))
     window_start_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     window_end_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -479,15 +483,9 @@ class FeatureStatistic(Base):
         Index("ix_feature_statistics_tenant_date", "tenant_id", "stat_date"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
-    recording_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("recordings.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    recording_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("recordings.id"))
     model_version: Mapped[str] = mapped_column(String(64))
     feature_schema_version: Mapped[str] = mapped_column(String(64))
     stat_date: Mapped[date] = mapped_column(Date, index=True)
@@ -504,12 +502,8 @@ class ServiceClient(Base):
     __tablename__ = "service_clients"
     __table_args__ = (Index("ix_service_clients_tenant", "tenant_id"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     name: Mapped[str] = mapped_column(String(128), unique=True)
     role: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), default="active")
@@ -527,9 +521,7 @@ class ServiceClientKey(Base):
         Index("ix_service_client_keys_client", "client_id", "status"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("service_clients.id")
     )
@@ -548,12 +540,8 @@ class AuditorReport(Base):
     __tablename__ = "auditor_reports"
     __table_args__ = (Index("ix_auditor_reports_tenant", "tenant_id", "detected_at"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     issue_type: Mapped[str] = mapped_column(String(64))
     severity: Mapped[str] = mapped_column(String(16))
     recording_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -566,12 +554,8 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     __table_args__ = (Index("ix_audit_logs_tenant", "tenant_id", "timestamp"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tenants.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     actor: Mapped[str] = mapped_column(String(128))
     action: Mapped[str] = mapped_column(String(128))
     target_type: Mapped[str] = mapped_column(String(128))
