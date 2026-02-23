@@ -11,28 +11,39 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
         <span class="app-header__brand">Noctis</span>
         <nav class="app-header__nav">
           <a
-            routerLink="/sleep-summary"
+            routerLink="/dashboard"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
-            Morning
-          </a>
-          <a routerLink="/" routerLinkActive="active" ariaCurrentWhenActive="page">
-            Home
+            Dashboard
           </a>
           <a
-            routerLink="/account"
+            routerLink="/report"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
-            Account
+            Report
           </a>
           <a
-            routerLink="/search"
+            routerLink="/coach"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
-            Search
+            Coach
+          </a>
+          <a
+            routerLink="/alarm"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+          >
+            Alarm
+          </a>
+          <a
+            routerLink="/device"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+          >
+            Device
           </a>
         </nav>
       </div>

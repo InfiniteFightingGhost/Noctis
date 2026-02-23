@@ -13,7 +13,7 @@ import { SleepSummary } from "../api/sleep-summary.types";
             <h3>Sleep Score Breakdown</h3>
             <p>
               {{ summary?.scoreLabel ?? "--" }} night with
-              {{ formatMinutesAsClock(summary?.totals.totalSleepMin) }} asleep.
+              {{ formatMinutesAsClock(summary?.totals?.totalSleepMin) }} asleep.
             </p>
           </div>
           <button type="button" (click)="close()">Close</button>
@@ -29,12 +29,24 @@ import { SleepSummary } from "../api/sleep-summary.types";
           </div>
           <div>
             <span>Efficiency</span>
-            <strong>{{ formatPct(summary?.totals.sleepEfficiencyPct) }}</strong>
+            <strong>{{ formatPct(summary?.totals?.sleepEfficiencyPct) }}</strong>
           </div>
           <div>
             <span>Deep</span>
-            <strong>{{ formatPct(summary?.metrics.deepPct) }}</strong>
+            <strong>{{ formatPct(summary?.metrics?.deepPct) }}</strong>
           </div>
+        </div>
+        <div class="sleep-summary__sheet-section">
+          <h4>Top drivers</h4>
+          <ul>
+            <li>Consistent bedtime within 20 minutes.</li>
+            <li>Low movement after 02:00.</li>
+            <li>Deep sleep held steady in cycle one.</li>
+          </ul>
+        </div>
+        <div class="sleep-summary__sheet-section">
+          <h4>Recommended</h4>
+          <p>Start wind-down 20 minutes earlier tonight.</p>
         </div>
       </div>
     </dialog>

@@ -24,6 +24,17 @@
   gap: 0.25rem;
 }
 
+.sleep-summary__sub {
+  font-size: 0.85rem;
+  color: var(--text-1);
+}
+
+.sleep-summary__date-block {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: end;
+}
+
 .sleep-summary__date {
   font-size: 0.95rem;
   letter-spacing: 0.02em;
@@ -61,6 +72,12 @@
 .sleep-summary__score-label {
   font-size: 1.1rem;
   color: var(--text-1);
+}
+
+.sleep-summary__score-meta {
+  font-size: 0.85rem;
+  color: var(--text-1);
+  margin-top: 0.35rem;
 }
 
 .sleep-summary__score-hint {
@@ -167,6 +184,10 @@
 
 .sleep-summary__cta {
   margin-top: 0.4rem;
+  display: grid;
+  gap: 0.5rem;
+  position: sticky;
+  bottom: 70px;
 }
 
 .sleep-summary__button {
@@ -305,6 +326,26 @@
   display: block;
   margin-top: 0.25rem;
   font-size: 1.05rem;
+}
+
+.sleep-summary__sheet-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sleep-summary__sheet-section h4 {
+  margin: 0;
+}
+
+.sleep-summary__sheet-section ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--text-1);
+}
+
+.sleep-summary__sheet-section p {
+  margin: 0;
+  color: var(--text-1);
 }
 
 .sleep-summary__skeleton {

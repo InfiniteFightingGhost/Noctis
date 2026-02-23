@@ -1,18 +1,26 @@
 import { Component, Input } from "@angular/core";
 import { formatShortDate, formatShortTime } from "../../../core/utils/format";
+import { StatusChipComponent, StatusChipVariant } from "../../../shared/ui/status-chip/status-chip.component";
 
 @Component({
   selector: "app-morning-header",
   standalone: true,
+  imports: [StatusChipComponent],
   template: `
     <header class="sleep-summary__header">
       <div class="sleep-summary__greeting">
-        <span class="sleep-summary__date">{{ formattedDate }}</span>
         <span class="sleep-summary__title">Good morning</span>
+        <span class="sleep-summary__sub">Morning summary</span>
       </div>
-      @if (syncLabel) {
-        <span class="ui-pill" aria-live="polite">{{ syncLabel }}</span>
-      }
+      <div class="sleep-summary__date-block">
+        <span class="sleep-summary__date">{{ formattedDate }}</span>
+        @if (syncLabel) {
+          <ui-status-chip
+            [variant]="syncVariant"
+            [label]="syncLabel"
+          />
+        }
+      </div>
     </header>
   `,
 })
@@ -39,5 +47,17 @@ export class MorningHeaderComponent {
     }
 
     return null;
+  }
+
+  get syncVariant(): StatusChipVariant {
+    if (this.syncStatus === "syncing") {
+      return "syncing";
+    }
+
+    if (this.syncStatus === "error") {
+      return "error";
+    }
+
+    return "ok";
   }
 }

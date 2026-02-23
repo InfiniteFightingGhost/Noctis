@@ -15,6 +15,7 @@ COPY app /app/app
 COPY alembic /app/alembic
 COPY alembic.ini /app/alembic.ini
 COPY models /app/models
+COPY configs /app/configs
 
 COPY docker /app/docker
 COPY docker/entrypoint.sh /app/entrypoint.sh

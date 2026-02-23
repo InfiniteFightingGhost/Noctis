@@ -70,8 +70,8 @@ def merge_feature_stats(
     incoming_p50 = cast(list[float], incoming_norm["p50"])
     existing_p90 = cast(list[float], existing_norm["p90"])
     incoming_p90 = cast(list[float], incoming_norm["p90"])
-    existing_count = int(existing_norm["count"])
-    incoming_count = int(incoming_norm["count"])
+    existing_count = _coerce_count(existing_norm["count"])
+    incoming_count = _coerce_count(incoming_norm["count"])
 
     sums = _merge_lists(existing_sum, incoming_sum, lambda a, b: a + b)
     sum_squares = _merge_lists(
@@ -117,9 +117,9 @@ def merge_feature_stats(
 
 def extract_means(stats: dict[str, object]) -> list[float]:
     if "means" in stats:
-        return [float(value) for value in stats.get("means", [])]
+        return _extract_float_list(stats, "means")
     normalized = _normalize_stats(stats)
-    count = int(normalized["count"])
+    count = _coerce_count(normalized["count"])
     if count <= 0:
         return []
     sums = cast(list[float], normalized["sum"])
@@ -128,7 +128,7 @@ def extract_means(stats: dict[str, object]) -> list[float]:
 
 def _normalize_stats(stats: dict[str, object]) -> dict[str, list[float] | int]:
     if "sum" in stats and "sum_squares" in stats:
-        count = int(stats.get("count", 0) or 0)
+        count = _extract_count(stats)
         sums = _extract_float_list(stats, "sum")
         sum_squares = _extract_float_list(stats, "sum_squares")
         means = (
@@ -146,15 +146,13 @@ def _normalize_stats(stats: dict[str, object]) -> dict[str, list[float] | int]:
             "p50": _normalize_percentiles(stats, "p50", means),
             "p90": _normalize_percentiles(stats, "p90", means),
         }
-    count = int(stats.get("count", 0) or 0)
+    count = _extract_count(stats)
     means = _extract_float_list(stats, "means")
     stds = _extract_float_list(stats, "stds")
     if len(stds) < len(means):
         stds = [*stds, *([0.0] * (len(means) - len(stds)))]
     sums = [value * count for value in means]
-    sum_squares = [
-        ((stds[idx] ** 2) + (means[idx] ** 2)) * count for idx in range(len(means))
-    ]
+    sum_squares = [((stds[idx] ** 2) + (means[idx] ** 2)) * count for idx in range(len(means))]
     mins = _extract_float_list(stats, "mins", fallback=means)
     maxs = _extract_float_list(stats, "maxs", fallback=means)
     return {
@@ -204,8 +202,7 @@ def _merge_weighted_lists(
         return []
     size = min(len(left), len(right))
     merged = [
-        float((left[idx] * left_count + right[idx] * right_count) / total)
-        for idx in range(size)
+        float((left[idx] * left_count + right[idx] * right_count) / total) for idx in range(size)
     ]
     return merged
 
@@ -228,3 +225,16 @@ def _extract_float_list(
     if fallback is None:
         return []
     return [float(value) for value in fallback]
+
+
+def _extract_count(stats: dict[str, object]) -> int:
+    value = stats.get("count", 0)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    return 0
+
+
+def _coerce_count(value: list[float] | int) -> int:
+    return value if isinstance(value, int) else 0

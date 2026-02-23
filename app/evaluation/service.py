@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from math import isfinite
+from typing import Any, cast
+import json
+from pathlib import Path
 import uuid
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import ModelUsageStat, Prediction
+from app.db.models import ModelUsageStat, Prediction, ModelVersion
 from app.drift.stats import mean, std, z_score
 from app.evaluation.stats import (
     accuracy,
@@ -16,6 +19,7 @@ from app.evaluation.stats import (
     confidence_histogram,
     confusion_matrix,
     entropy_metrics,
+    merge_labels,
     macro_f1,
     night_summary_delta,
     night_summary_metrics,
@@ -27,7 +31,7 @@ from app.evaluation.stats import (
 
 
 def _apply_prediction_filters(
-    query,
+    query: Any,
     *,
     tenant_id: uuid.UUID,
     recording_id: uuid.UUID | None = None,
@@ -73,6 +77,7 @@ def compute_evaluation(
     )
     query = query.order_by(Prediction.window_end_ts)
     rows = query.all()
+    model_label_map = _resolve_label_map(session, model_version)
 
     predicted: list[str] = []
     truth: list[str] = []
@@ -82,26 +87,37 @@ def compute_evaluation(
     for pred, gt, confidence, probs, _ts in rows:
         predicted.append(pred)
         sequence.append(pred)
-        confidences.append(float(confidence))
-        probabilities.append({str(k): float(v) for k, v in probs.items()})
+        confidence_value = float(confidence)
+        if not isfinite(confidence_value):
+            confidence_value = 0.0
+        confidences.append(confidence_value)
+        probabilities.append(
+            {str(k): (float(v) if isfinite(float(v)) else 0.0) for k, v in probs.items()}
+        )
         if gt:
             truth.append(gt)
         else:
             truth.append("__unlabeled__")
 
-    labeled_pairs = [
-        (t, p) for t, p in zip(truth, predicted, strict=True) if t != "__unlabeled__"
-    ]
+    labeled_pairs = [(t, p) for t, p in zip(truth, predicted, strict=True) if t != "__unlabeled__"]
     labeled_truth = [t for t, _ in labeled_pairs]
     labeled_pred = [p for _, p in labeled_pairs]
-
-    labels = build_labels(labeled_truth, labeled_pred) if labeled_pairs else []
+    if labeled_pairs:
+        if model_label_map:
+            labels = merge_labels(model_label_map, labeled_truth + labeled_pred)
+        else:
+            labels = build_labels(labeled_truth, labeled_pred)
+    else:
+        labels = []
     matrix = confusion_matrix(labeled_truth, labeled_pred, labels) if labels else []
     per_class = per_class_metrics(matrix, labels) if labels else []
     acc = accuracy(matrix) if labels else 0.0
     macro = macro_f1(per_class) if labels else 0.0
-    transitions = transition_matrix(sequence, sorted(set(sequence)))
-    transition_labels = sorted(set(sequence))
+    if model_label_map:
+        transition_labels = merge_labels(model_label_map, sequence)
+    else:
+        transition_labels = sorted(set(sequence))
+    transitions = transition_matrix(sequence, transition_labels)
 
     avg_confidence = average_confidence(confidences)
     distribution = prediction_distribution(predicted)
@@ -127,15 +143,33 @@ def compute_evaluation(
         "average_confidence": avg_confidence,
         "prediction_distribution": distribution,
         "per_class_frequency": class_frequency,
-        "transition_matrix": {
-            "labels": transition_labels,
-            "matrix": transitions,
-        },
+        "transition_matrix": {"labels": transition_labels, "matrix": transitions},
         "confidence_histogram": confidence_histogram(confidences),
         "entropy": entropy_metrics(probabilities),
         "night_summary_validation": night_validation,
         "generated_at": datetime.now(timezone.utc),
     }
+
+
+def _resolve_label_map(session: Session, model_version: str | None) -> list[str] | None:
+    if not model_version:
+        return None
+    model = session.execute(
+        select(ModelVersion).where(ModelVersion.version == model_version)
+    ).scalar_one_or_none()
+    if model is None or not model.artifact_path:
+        return None
+    model_dir = Path(model.artifact_path)
+    label_path = model_dir / "label_map.json"
+    if label_path.exists():
+        label_map = json.loads(label_path.read_text())
+        return [str(label) for label in label_map] if isinstance(label_map, list) else None
+    metadata_path = model_dir / "metadata.json"
+    if metadata_path.exists():
+        metadata = json.loads(metadata_path.read_text())
+        label_map = metadata.get("label_map")
+        return [str(label) for label in label_map] if isinstance(label_map, list) else None
+    return None
 
 
 def compute_rolling_evaluation(
@@ -198,9 +232,9 @@ def compute_model_usage_stats(
         func.sum(ModelUsageStat.prediction_count).label("prediction_count"),
         func.min(ModelUsageStat.window_start_ts).label("window_start_ts"),
         func.max(ModelUsageStat.window_end_ts).label("window_end_ts"),
-        func.sum(
-            ModelUsageStat.prediction_count * ModelUsageStat.average_latency_ms
-        ).label("weighted_latency"),
+        func.sum(ModelUsageStat.prediction_count * ModelUsageStat.average_latency_ms).label(
+            "weighted_latency"
+        ),
     )
     query = query.filter(ModelUsageStat.tenant_id == tenant_id)
     if model_version:
@@ -214,9 +248,7 @@ def compute_model_usage_stats(
     results: list[dict[str, object]] = []
     for row in query.all():
         prediction_count = int(row.prediction_count or 0)
-        avg_latency_ms = (
-            float(row.weighted_latency) / prediction_count if prediction_count else 0.0
-        )
+        avg_latency_ms = float(row.weighted_latency) / prediction_count if prediction_count else 0.0
         results.append(
             {
                 "model_version": row.model_version,
@@ -226,4 +258,4 @@ def compute_model_usage_stats(
                 "window_end_ts": row.window_end_ts,
             }
         )
-    return sorted(results, key=lambda item: item["model_version"])
+    return sorted(results, key=lambda item: cast(str, item["model_version"]))

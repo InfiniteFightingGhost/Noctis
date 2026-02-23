@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ from app.monitoring.memory import memory_rss_mb
 def build_performance_snapshot(
     session: Session, *, tenant_id, started_at: datetime, sample_size: int
 ) -> dict[str, object]:
-    pool = get_engine().pool
+    pool = cast(Any, get_engine().pool)
     breaker = get_circuit_breaker()
     now = datetime.now(timezone.utc)
 
@@ -55,9 +56,7 @@ def _compute_inference_metrics(rows: list[ModelUsageStat]) -> dict[str, object]:
             "p99_latency_ms": 0.0,
         }
     prediction_count = sum(row.prediction_count for row in rows)
-    weighted_latency = sum(
-        row.prediction_count * row.average_latency_ms for row in rows
-    )
+    weighted_latency = sum(row.prediction_count * row.average_latency_ms for row in rows)
     avg_latency = weighted_latency / prediction_count if prediction_count else 0.0
     latencies = sorted(row.average_latency_ms for row in rows)
     p95 = latencies[int(0.95 * (len(latencies) - 1))]
@@ -71,9 +70,7 @@ def _compute_inference_metrics(rows: list[ModelUsageStat]) -> dict[str, object]:
     }
 
 
-def _compute_db_write_speed(
-    session: Session, tenant_id, sample_size: int
-) -> dict[str, object]:
+def _compute_db_write_speed(session: Session, tenant_id, sample_size: int) -> dict[str, object]:
     rows = (
         session.query(Prediction.created_at)
         .filter(Prediction.tenant_id == tenant_id)
@@ -107,7 +104,4 @@ def _fetch_slow_queries(session: Session) -> list[dict[str, object]]:
         ).fetchall()
     except Exception:  # noqa: BLE001
         return []
-    return [
-        {"query": row[0], "total_time_ms": float(row[1]), "calls": int(row[2])}
-        for row in rows
-    ]
+    return [{"query": row[0], "total_time_ms": float(row[1]), "calls": int(row[2])} for row in rows]

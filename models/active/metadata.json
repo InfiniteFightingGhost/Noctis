@@ -4,5 +4,10 @@
   "metrics": {
     "accuracy": 0.82,
     "f1_macro": 0.78
-  }
+  },
+  "feature_strategy": "mean",
+  "window_size": 21,
+  "epoch_seconds": 30,
+  "window_stride": 1,
+  "expected_input_dim": 10
 }

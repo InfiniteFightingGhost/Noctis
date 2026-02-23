@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.dataset.builder import (
     DatasetBuildResult,
-    _stratified_split_indices,
+    _recording_split_indices,
+    _validate_split_integrity,
     build_dataset,
 )
 from app.dataset.config import DatasetBuildConfig, DatasetSplitConfig
@@ -23,6 +24,7 @@ from app.db.models import DatasetSnapshot, DatasetSnapshotWindow, Epoch
 from app.db.session import run_with_db_retry
 from app.feature_store.service import get_feature_schema_by_version
 from app.ml.feature_decode import decode_features
+from app.ml.validation import ensure_finite
 from app.reproducibility.snapshots import compute_snapshot_checksum, snapshot_window_id
 from app.services.windowing import WindowedEpoch, build_windows
 
@@ -41,13 +43,22 @@ def create_snapshot(config: DatasetSnapshotConfig) -> SnapshotCreateResult:
         feature_schema_path=None,
         feature_schema_version=config.feature_schema_version,
         window_size=config.window_size,
+        epoch_seconds=config.epoch_seconds,
         allow_padding=config.allow_padding,
+        window_alignment=config.window_alignment,
+        padding_policy=config.padding_policy,
+        label_source_policy=config.label_source_policy,
         label_strategy=config.label_strategy,
+        allow_predicted_labels=config.allow_predicted_labels,
         balance_strategy=config.balance_strategy,
         random_seed=config.random_seed,
         export_format=config.export_format,
         split=config.split,
         filters=config.filters,
+        split_strategy=config.split_strategy,
+        split_time_aware=config.split_time_aware,
+        split_purge_gap=config.split_purge_gap,
+        split_block_seconds=config.split_block_seconds,
     )
     result = build_dataset(build_config)
     entries = _snapshot_entries(result)
@@ -147,32 +158,50 @@ def _load_snapshot(session: Session, snapshot_id: uuid.UUID) -> DatasetBuildResu
     recording_ids = {window.recording_id for window in windows}
     epochs = _fetch_epochs(session, recording_ids, schema)
     window_size = int((snapshot.recording_filter or {}).get("window_size") or 21)
-    allow_padding = bool(
-        (snapshot.recording_filter or {}).get("allow_padding") or False
-    )
-    window_map = _build_window_map(epochs, window_size, allow_padding)
+    epoch_seconds = int((snapshot.recording_filter or {}).get("epoch_seconds") or 30)
+    padding_policy = (snapshot.recording_filter or {}).get("padding_policy")
+    if padding_policy is None:
+        allow_padding = bool((snapshot.recording_filter or {}).get("allow_padding") or False)
+    else:
+        allow_padding = str(padding_policy) == "zero_fill"
+    window_map = _build_window_map(epochs, window_size, allow_padding, epoch_seconds=epoch_seconds)
     X: list[np.ndarray] = []
     y: list[str] = []
     label_sources: list[str] = []
     window_end_ts: list[str] = []
     recording_list: list[str] = []
+    padded_window_count = 0
     for window in windows:
         tensors = window_map.get(window.recording_id, {})
-        tensor = tensors.get(window.window_end_ts)
-        if tensor is None:
+        tensor_entry = tensors.get(window.window_end_ts)
+        if tensor_entry is None:
             raise ValueError("Snapshot window not found in epochs")
+        tensor, padded = tensor_entry
+        if padded:
+            padded_window_count += 1
         X.append(tensor)
         y.append(str(window.label_value))
         label_sources.append(window.label_source or "unknown")
         window_end_ts.append(window.window_end_ts.isoformat())
         recording_list.append(str(window.recording_id))
     split_config = _split_config(snapshot.recording_filter)
-    splits = _stratified_split_indices(
-        np.asarray(y),
+    splits = _recording_split_indices(
+        np.asarray(recording_list),
+        np.asarray(window_end_ts),
         train_ratio=split_config.train,
         val_ratio=split_config.val,
         test_ratio=split_config.test,
         seed=_random_seed(snapshot.recording_filter),
+        split_strategy=_split_strategy(snapshot.recording_filter),
+        split_time_aware=_split_time_aware(snapshot.recording_filter),
+        split_purge_gap=_split_purge_gap(snapshot.recording_filter),
+        split_block_seconds=_split_block_seconds(snapshot.recording_filter),
+    )
+    _validate_split_integrity(
+        np.asarray(recording_list),
+        splits,
+        enforce_recording_unique=_split_strategy(snapshot.recording_filter) == "recording",
+        allow_unassigned=_split_purge_gap(snapshot.recording_filter) > 0,
     )
     label_map = sorted({label for label in y})
     metadata = {
@@ -183,9 +212,30 @@ def _load_snapshot(session: Session, snapshot_id: uuid.UUID) -> DatasetBuildResu
         "feature_schema_version": snapshot.feature_schema_version,
         "feature_names": schema.feature_names,
         "label_strategy": snapshot.label_source,
+        "label_source_policy": snapshot.label_source,
+        "allow_predicted_labels": bool(
+            (snapshot.recording_filter or {}).get("allow_predicted_labels") or False
+        ),
+        "label_source_counts": _label_source_counts(np.asarray(label_sources)),
+        "padded_window_count": padded_window_count,
         "filters": snapshot.recording_filter or {},
         "split_sizes": {k: int(v.size) for k, v in splits.items()},
         "label_map": label_map,
+        "split_policy": {
+            "split_strategy": _split_strategy(snapshot.recording_filter),
+            "seed": _random_seed(snapshot.recording_filter),
+            "grouping_key": "recording_id",
+            "time_aware": _split_time_aware(snapshot.recording_filter),
+            "purge_gap": _split_purge_gap(snapshot.recording_filter),
+            "block_seconds": _split_block_seconds(snapshot.recording_filter),
+        },
+        "window_alignment": {
+            "end_ts": "epoch_start_plus_duration",
+            "epoch_seconds": epoch_seconds,
+            "padding_policy": "zero_fill" if allow_padding else "reject",
+            "alignment": _window_alignment(snapshot.recording_filter),
+        },
+        "window_stride": 1,
     }
     return DatasetBuildResult(
         X=np.asarray(X, dtype=np.float32),
@@ -222,6 +272,7 @@ def _fetch_epochs(
         if schema_version != schema.version:
             raise ValueError("Feature schema mismatch for snapshot reload")
         vector = decode_features(payload, schema)
+        ensure_finite("features", vector)
         epochs.setdefault(recording_id, []).append(
             WindowedEpoch(
                 epoch_index=epoch_index,
@@ -237,15 +288,20 @@ def _build_window_map(
     epochs: dict[uuid.UUID, list[WindowedEpoch]],
     window_size: int,
     allow_padding: bool,
-) -> dict[uuid.UUID, dict[datetime, np.ndarray]]:
-    window_map: dict[uuid.UUID, dict[datetime, np.ndarray]] = {}
+    *,
+    epoch_seconds: int,
+) -> dict[uuid.UUID, dict[datetime, tuple[np.ndarray, bool]]]:
+    window_map: dict[uuid.UUID, dict[datetime, tuple[np.ndarray, bool]]] = {}
     for recording_id, items in epochs.items():
         windows = build_windows(
-            items, window_size=window_size, allow_padding=allow_padding
+            items,
+            window_size=window_size,
+            allow_padding=allow_padding,
+            epoch_seconds=epoch_seconds,
         )
-        per_recording: dict[datetime, np.ndarray] = {}
+        per_recording: dict[datetime, tuple[np.ndarray, bool]] = {}
         for window in windows:
-            per_recording[window.end_ts] = window.tensor
+            per_recording[window.end_ts] = (window.tensor, window.padded)
         window_map[recording_id] = per_recording
     return window_map
 
@@ -286,9 +342,7 @@ def _snapshot_date_range(result: DatasetBuildResult) -> tuple[datetime, datetime
 
 def _recording_filter_payload(config: DatasetSnapshotConfig) -> dict[str, Any]:
     return {
-        "from_ts": config.filters.from_ts.isoformat()
-        if config.filters.from_ts
-        else None,
+        "from_ts": config.filters.from_ts.isoformat() if config.filters.from_ts else None,
         "to_ts": config.filters.to_ts.isoformat() if config.filters.to_ts else None,
         "device_id": config.filters.device_id,
         "recording_id": config.filters.recording_id,
@@ -296,10 +350,19 @@ def _recording_filter_payload(config: DatasetSnapshotConfig) -> dict[str, Any]:
         "model_version": config.filters.model_version,
         "tenant_id": config.filters.tenant_id,
         "window_size": config.window_size,
+        "epoch_seconds": config.epoch_seconds,
         "allow_padding": config.allow_padding,
+        "window_alignment": config.window_alignment,
+        "padding_policy": config.padding_policy,
+        "label_source_policy": config.label_source_policy,
         "label_strategy": config.label_strategy,
+        "allow_predicted_labels": config.allow_predicted_labels,
         "balance_strategy": config.balance_strategy,
         "random_seed": config.random_seed,
+        "split_strategy": config.split_strategy,
+        "split_time_aware": config.split_time_aware,
+        "split_purge_gap": config.split_purge_gap,
+        "split_block_seconds": config.split_block_seconds,
         "split": {
             "train": config.split.train,
             "val": config.split.val,
@@ -331,9 +394,7 @@ def _update_snapshot_metadata(
     path.write_text(json.dumps(metadata, indent=2))
 
 
-def _export_snapshot(
-    result: DatasetBuildResult, output_dir: Path, export_format: str
-) -> None:
+def _export_snapshot(result: DatasetBuildResult, output_dir: Path, export_format: str) -> None:
     if export_format == "npz":
         save_npz(
             output_dir,
@@ -387,6 +448,42 @@ def _split_config(recording_filter: dict[str, Any] | None) -> DatasetSplitConfig
     return config
 
 
+def _split_strategy(recording_filter: dict[str, Any] | None) -> str:
+    filters = recording_filter or {}
+    return str(filters.get("split_strategy") or "recording")
+
+
+def _split_time_aware(recording_filter: dict[str, Any] | None) -> bool:
+    filters = recording_filter or {}
+    split_strategy = str(filters.get("split_strategy") or "recording")
+    return bool(filters.get("split_time_aware", split_strategy == "recording_time"))
+
+
+def _split_purge_gap(recording_filter: dict[str, Any] | None) -> int:
+    filters = recording_filter or {}
+    return int(filters.get("split_purge_gap", 0))
+
+
+def _split_block_seconds(recording_filter: dict[str, Any] | None) -> int | None:
+    filters = recording_filter or {}
+    value = filters.get("split_block_seconds")
+    if value is None:
+        return None
+    return int(value)
+
+
+def _window_alignment(recording_filter: dict[str, Any] | None) -> str:
+    filters = recording_filter or {}
+    return str(filters.get("window_alignment") or "epoch_end")
+
+
 def _random_seed(recording_filter: dict[str, Any] | None) -> int:
     filters = recording_filter or {}
     return int(filters.get("random_seed", 42))
+
+
+def _label_source_counts(label_sources: np.ndarray) -> dict[str, int]:
+    if label_sources.size == 0:
+        return {}
+    unique, counts = np.unique(label_sources, return_counts=True)
+    return {str(label): int(count) for label, count in zip(unique, counts)}

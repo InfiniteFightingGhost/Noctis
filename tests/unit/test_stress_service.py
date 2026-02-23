@@ -14,11 +14,13 @@ def test_stress_run_reproducible() -> None:
         version="active",
         model=LinearSoftmaxModel(artifacts),
         feature_schema=FeatureSchema(version="v1", features=["f"] * 10),
-        metadata={},
+        metadata={
+            "feature_strategy": "mean",
+            "expected_input_dim": 10,
+            "window_size": 2,
+        },
     )
-    result_a = run_inference_stress(
-        model, iterations=3, batch_size=2, window_size=2, seed=7
-    )
+    result_a = run_inference_stress(model, iterations=3, batch_size=2, window_size=2, seed=7)
     assert result_a["avg_latency_ms"] >= 0.0
     assert result_a["p95_latency_ms"] >= 0.0
     assert result_a["throughput_per_sec"] >= 0.0

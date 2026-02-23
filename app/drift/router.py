@@ -60,9 +60,7 @@ def model_drift(
         feature["status"] = status
         feature["severity"] = severity
         feature["drift_score"] = score
-        DRIFT_SCORE_GAUGE.labels(metric=f"feature_{feature['feature_index']}").set(
-            score
-        )
+        DRIFT_SCORE_GAUGE.labels(metric=f"feature_{feature['feature_index']}").set(score)
         if status == "alert":
             alert_count += 1
             flagged_features.append(
@@ -78,10 +76,7 @@ def model_drift(
     DRIFT_SEVERITY_GAUGE.labels(scope="model").set(_severity_value(overall_severity))
     max_drift_score = max(
         [metric.get("drift_score", 0.0) for metric in payload["metrics"]]
-        + [
-            feature.get("drift_score", 0.0)
-            for feature in payload.get("feature_drift", [])
-        ]
+        + [feature.get("drift_score", 0.0) for feature in payload.get("feature_drift", [])]
         or [0.0]
     )
     payload.update(
@@ -123,6 +118,8 @@ def _schedule_retrain(
 
     def _op(session):
         schema = get_active_feature_schema(session)
+        if schema is None:
+            raise ValueError("Active feature schema not found")
         dataset_config = {
             "name": f"retrain_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
             "output_dir": str(output_dir),
@@ -163,10 +160,7 @@ def _schedule_retrain(
             tenant_id=tenant_id,
             drift_score=max(
                 [metric.get("drift_score", 0.0) for metric in payload["metrics"]]
-                + [
-                    feature.get("drift_score", 0.0)
-                    for feature in payload.get("feature_drift", [])
-                ]
+                + [feature.get("drift_score", 0.0) for feature in payload.get("feature_drift", [])]
                 or [0.0]
             ),
             triggering_features=flagged_features,
@@ -179,18 +173,14 @@ def _schedule_retrain(
     run_with_db_retry(_op, commit=True, operation_name="enqueue_retrain")
 
 
-def _classify_metric(
-    metric: dict, thresholds: dict[str, float]
-) -> tuple[str, str, float]:
+def _classify_metric(metric: dict, thresholds: dict[str, float]) -> tuple[str, str, float]:
     score, threshold = _metric_score_threshold(metric, thresholds)
     status = "alert" if score >= threshold else "ok"
     severity = _severity(score, threshold)
     return status, severity, score
 
 
-def _classify_feature(
-    metric: dict, thresholds: dict[str, float]
-) -> tuple[str, str, float]:
+def _classify_feature(metric: dict, thresholds: dict[str, float]) -> tuple[str, str, float]:
     score = abs(float(metric.get("z_score") or 0.0))
     threshold = thresholds["z"]
     status = "alert" if score >= threshold else "ok"
@@ -198,9 +188,7 @@ def _classify_feature(
     return status, severity, score
 
 
-def _metric_score_threshold(
-    metric: dict, thresholds: dict[str, float]
-) -> tuple[float, float]:
+def _metric_score_threshold(metric: dict, thresholds: dict[str, float]) -> tuple[float, float]:
     psi_value = metric.get("psi")
     kl_value = metric.get("kl_divergence")
     if psi_value is not None and kl_value is not None:
@@ -225,15 +213,13 @@ def _severity(score: float, threshold: float) -> str:
     return "LOW"
 
 
-def _overall_severity(
-    metrics: list[dict], feature_drift: list[dict], alert_count: int
-) -> str:
+def _overall_severity(metrics: list[dict], feature_drift: list[dict], alert_count: int) -> str:
     severity_order = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
-    all_severities = [
-        item.get("severity")
-        for item in [*metrics, *feature_drift]
-        if item.get("severity")
-    ]
+    all_severities: list[str] = []
+    for item in [*metrics, *feature_drift]:
+        severity = item.get("severity")
+        if isinstance(severity, str):
+            all_severities.append(severity)
     max_severity = max(
         all_severities,
         default="LOW",

@@ -41,74 +41,73 @@ async def test_load_and_drift_flow() -> None:
     read_headers = build_auth_header(read_client)
     admin_headers = build_auth_header(admin_client)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        recordings: list[str] = []
-        for idx in range(100):
-            device = (
-                await client.post(
-                    "/v1/devices",
-                    json={"name": f"device-{idx}"},
-                    headers=ingest_headers,
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            recordings: list[str] = []
+            for idx in range(100):
+                device = (
+                    await client.post(
+                        "/v1/devices",
+                        json={"name": f"device-{idx}"},
+                        headers=ingest_headers,
+                    )
+                ).json()
+                recording = (
+                    await client.post(
+                        "/v1/recordings",
+                        json={
+                            "device_id": device["id"],
+                            "started_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                        headers=ingest_headers,
+                    )
+                ).json()
+                recordings.append(recording["id"])
+
+            start = datetime.now(timezone.utc)
+            epochs_payload = []
+            for i in range(21):
+                epochs_payload.append(
+                    {
+                        "epoch_index": i,
+                        "epoch_start_ts": (start + timedelta(seconds=30 * i)).isoformat(),
+                        "feature_schema_version": "v1",
+                        "features": [0.1] * 10,
+                    }
                 )
-            ).json()
-            recording = (
-                await client.post(
-                    "/v1/recordings",
-                    json={
-                        "device_id": device["id"],
-                        "started_at": datetime.now(timezone.utc).isoformat(),
-                    },
-                    headers=ingest_headers,
+
+            for recording_id in recordings:
+                ingest = (
+                    await client.post(
+                        "/v1/epochs:ingest",
+                        headers=ingest_headers,
+                        json={"recording_id": recording_id, "epochs": epochs_payload},
+                    )
+                ).json()
+                assert ingest["inserted"] == 21
+
+            async def _predict(recording_id: str):
+                return await client.post(
+                    "/v1/predict",
+                    headers=read_headers,
+                    json={"recording_id": recording_id},
                 )
-            ).json()
-            recordings.append(recording["id"])
 
-        start = datetime.now(timezone.utc)
-        epochs_payload = []
-        for i in range(21):
-            epochs_payload.append(
-                {
-                    "epoch_index": i,
-                    "epoch_start_ts": (start + timedelta(seconds=30 * i)).isoformat(),
-                    "feature_schema_version": "v1",
-                    "features": [0.1] * 10,
-                }
-            )
+            tasks = [_predict(recordings[idx]) for idx in range(10)]
+            reload_task = client.post("/v1/models/reload", headers=admin_headers)
+            results = await asyncio.gather(*tasks, reload_task)
+            for response in results[:-1]:
+                assert response.status_code == 200
+            reload_response = results[-1]
+            assert reload_response.status_code == 200
+            payload = reload_response.json()
+            assert payload["reloaded"] is True
+            assert payload["model_version"] == "active"
 
-        for recording_id in recordings:
-            ingest = (
-                await client.post(
-                    "/v1/epochs:ingest",
-                    headers=ingest_headers,
-                    json={"recording_id": recording_id, "epochs": epochs_payload},
-                )
-            ).json()
-            assert ingest["inserted"] == 21
-
-        async def _predict(recording_id: str):
-            return await client.post(
-                "/v1/predict",
-                headers=read_headers,
-                json={"recording_id": recording_id},
-            )
-
-        tasks = [_predict(recordings[idx]) for idx in range(10)]
-        reload_task = client.post("/v1/models/reload", headers=admin_headers)
-        results = await asyncio.gather(*tasks, reload_task)
-        for response in results[:-1]:
-            assert response.status_code == 200
-        reload_response = results[-1]
-        assert reload_response.status_code == 200
-        payload = reload_response.json()
-        assert payload["reloaded"] is True
-        assert payload["model_version"] == "active"
-
-        _seed_drift_data(recordings[0], ingest_client["tenant_id"])
-        drift = (await client.get("/v1/model/drift", headers=read_headers)).json()
-        assert drift["metrics"]
-        assert drift["flagged_features"]
+            _seed_drift_data(recordings[0], ingest_client["tenant_id"])
+            drift = (await client.get("/v1/model/drift", headers=read_headers)).json()
+            assert drift["metrics"]
+            assert drift["flagged_features"]
 
 
 def _seed_drift_data(recording_id: str, tenant_id: str) -> None:
@@ -190,9 +189,7 @@ def _seed_drift_data(recording_id: str, tenant_id: str) -> None:
                 model_version="active",
                 feature_schema_version="v1",
                 stat_date=today,
-                window_end_ts=datetime.combine(
-                    today, datetime.min.time(), tzinfo=timezone.utc
-                ),
+                window_end_ts=datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc),
                 stats={"means": [12.0, 8.5], "count": 2},
             ),
         ]

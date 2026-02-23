@@ -38,9 +38,7 @@ def create_recording(
 
     device = run_with_db_retry(_device, operation_name="recording_device")
     if not device:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
 
     def _create(session):
         recording = Recording(
@@ -54,10 +52,33 @@ def create_recording(
         session.refresh(recording)
         return recording
 
-    recording = run_with_db_retry(
-        _create, commit=True, operation_name="recording_create"
-    )
+    recording = run_with_db_retry(_create, commit=True, operation_name="recording_create")
     return RecordingResponse.model_validate(recording)
+
+
+@router.get(
+    "/recordings",
+    response_model=list[RecordingResponse],
+    dependencies=[Depends(require_scopes("read"))],
+)
+def list_recordings(
+    device_id: uuid.UUID | None = None,
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+    tenant: TenantContext = Depends(get_tenant_context),
+) -> list[RecordingResponse]:
+    def _op(session):
+        query = session.query(Recording).filter(Recording.tenant_id == tenant.id)
+        if device_id:
+            query = query.filter(Recording.device_id == device_id)
+        if from_ts:
+            query = query.filter(Recording.started_at >= from_ts)
+        if to_ts:
+            query = query.filter(Recording.started_at <= to_ts)
+        return query.order_by(Recording.started_at.desc()).all()
+
+    recordings = run_with_db_retry(_op, operation_name="recordings_list")
+    return [RecordingResponse.model_validate(recording) for recording in recordings]
 
 
 @router.get(
@@ -79,9 +100,7 @@ def get_recording(
 
     recording = run_with_db_retry(_op, operation_name="recording_get")
     if not recording:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
     return RecordingResponse.model_validate(recording)
 
 
@@ -184,6 +203,4 @@ def _ensure_recording(recording_id: uuid.UUID, tenant: TenantContext) -> None:
 
     recording = run_with_db_retry(_op, operation_name="recording_check")
     if not recording:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")

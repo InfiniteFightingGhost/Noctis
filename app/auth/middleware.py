@@ -22,23 +22,31 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._exempt_paths = exempt_paths or set()
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.url.path in self._exempt_paths:
             return await call_next(request)
         authorization = request.headers.get(get_settings().auth_header)
         if not authorization:
             _log_auth_failure("missing_token", request)
             response = JSONResponse(
-                status_code=401, content={"detail": "Missing Authorization header"}
+                status_code=401,
+                content=_error_payload(
+                    code="missing_token",
+                    message="Missing Authorization header",
+                    classification="client",
+                ),
             )
             _set_request_headers(response)
             return response
         if not authorization.startswith("Bearer "):
             _log_auth_failure("invalid_scheme", request)
             response = JSONResponse(
-                status_code=401, content={"detail": "Invalid Authorization scheme"}
+                status_code=401,
+                content=_error_payload(
+                    code="invalid_scheme",
+                    message="Invalid Authorization scheme",
+                    classification="client",
+                ),
             )
             _set_request_headers(response)
             return response
@@ -48,7 +56,12 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         except AuthError as exc:
             _log_auth_failure(exc.code, request)
             response = JSONResponse(
-                status_code=exc.status_code, content={"detail": exc.message}
+                status_code=exc.status_code,
+                content=_error_payload(
+                    code=exc.code,
+                    message=exc.message,
+                    classification="client",
+                ),
             )
             _set_request_headers(response)
             return response
@@ -89,3 +102,31 @@ def _set_request_headers(response: JSONResponse) -> None:
     request_id = get_request_id() or set_request_id(None)
     response.headers["X-Request-Id"] = request_id
     response.headers["X-Correlation-Id"] = request_id
+
+
+def _error_payload(
+    *,
+    code: str,
+    message: str,
+    classification: str,
+    extra: dict | None = None,
+) -> dict:
+    request_id = get_request_id() or set_request_id(None)
+    error_payload: dict[str, object] = {
+        "code": code,
+        "message": message,
+        "classification": classification,
+        "failure_classification": _failure_classification(code, classification),
+        "request_id": request_id,
+    }
+    if extra:
+        error_payload["extra"] = extra
+    return {"error": error_payload}
+
+
+def _failure_classification(code: str, classification: str) -> str:
+    if classification in {"dependency", "transient"}:
+        return "TRANSIENT"
+    if code in {"request_timeout", "db_error", "db_circuit_open", "model_unavailable"}:
+        return "TRANSIENT"
+    return "FATAL"

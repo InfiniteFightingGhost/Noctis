@@ -7,6 +7,7 @@ from app.evaluation.stats import (
     confidence_histogram,
     confusion_matrix,
     entropy_metrics,
+    merge_labels,
     night_summary_metrics,
     per_class_metrics,
     per_class_frequency,
@@ -80,3 +81,18 @@ def test_distribution_and_summary() -> None:
 
 def test_average_confidence() -> None:
     assert average_confidence([0.5, 0.75]) == 0.625
+
+
+def test_entropy_metrics_skips_non_finite() -> None:
+    entropy = entropy_metrics([{"W": 0.5, "N1": float("nan")}])
+    assert entropy["mean"] >= 0.0
+
+
+def test_confidence_histogram_skips_non_finite() -> None:
+    histogram = confidence_histogram([0.2, float("inf")], bins=4)
+    assert histogram["counts"] == [1, 0, 0, 0]
+
+
+def test_merge_labels_preserves_order() -> None:
+    merged = merge_labels(["W", "N1"], ["N2", "W", "REM"])
+    assert merged == ["W", "N1", "N2", "REM"]

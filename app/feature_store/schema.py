@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 import uuid
 
 from app.reproducibility.hashing import hash_json
@@ -62,13 +62,19 @@ def parse_feature_schema_payload(
             deprecated_in_version = None
             position = idx
         elif isinstance(item, dict):
-            name = item.get("name")
-            if not name or not isinstance(name, str):
+            name_raw = item.get("name")
+            if not name_raw or not isinstance(name_raw, str):
                 raise ValueError("Feature name is required")
+            name = name_raw
             dtype = str(item.get("dtype") or "float32")
-            allowed_range = item.get("allowed_range")
-            if allowed_range is not None and not isinstance(allowed_range, dict):
+            allowed_range_raw = item.get("allowed_range")
+            if allowed_range_raw is not None and not isinstance(allowed_range_raw, dict):
                 raise ValueError("allowed_range must be a JSON object")
+            allowed_range = (
+                cast(dict[str, float], allowed_range_raw)
+                if isinstance(allowed_range_raw, dict)
+                else None
+            )
             feature_description = item.get("description")
             introduced_in_version = str(item.get("introduced_in_version") or version)
             deprecated_in_version = item.get("deprecated_in_version")

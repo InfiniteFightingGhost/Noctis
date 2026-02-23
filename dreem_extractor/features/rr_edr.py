@@ -4,12 +4,7 @@ import numpy as np
 
 from dreem_extractor.constants import FlagBits, INT8_UNKNOWN, UINT8_UNKNOWN
 from dreem_extractor.features.base import FeatureContext, FeatureOutput, FeaturePlugin
-from dreem_extractor.features.utils import (
-    bandpass_filter,
-    bandpower_ratio,
-    detect_peaks,
-    mad,
-)
+from dreem_extractor.features.utils import bandpass_filter, detect_peaks, mad
 
 
 class EDRPlugin(FeaturePlugin):
@@ -58,71 +53,235 @@ class EDRPlugin(FeaturePlugin):
 
         peak_times = peaks / ecg.fs
         peak_amp = filtered[peaks]
-        edr_fs = 4.0
+        edr_fs = ctx.config.thresholds.edr_fs
         duration = len(ecg.data) / ecg.fs
         times = np.arange(0, duration, 1.0 / edr_fs)
-        edr = np.interp(
-            times, peak_times, peak_amp, left=peak_amp[0], right=peak_amp[-1]
-        )
-
-        edr_filtered = bandpass_filter(
+        edr = np.interp(times, peak_times, peak_amp, left=peak_amp[0], right=peak_amp[-1])
+        edr = bandpass_filter(
             edr,
             edr_fs,
             ctx.config.thresholds.edr_band_hz[0],
             ctx.config.thresholds.edr_band_hz[1],
         )
-        min_rr, max_rr = ctx.config.thresholds.rr_range_bpm
-        min_breaths = ctx.config.thresholds.min_breaths_per_epoch
+
+        rr_psd_series = np.zeros(n_epochs, dtype=np.float32)
+        rr_ac_series = np.zeros(n_epochs, dtype=np.float32)
+        rr_peak_series = np.zeros(n_epochs, dtype=np.float32)
+        band_ratio_series = np.zeros(n_epochs, dtype=np.float32)
+        peak_prom_series = np.zeros(n_epochs, dtype=np.float32)
+        ac_peak_series = np.zeros(n_epochs, dtype=np.float32)
+        rr_std_raw = np.zeros(n_epochs, dtype=np.float32)
 
         samples_per_epoch = int(round(edr_fs * ctx.config.epoch_sec))
         for i in range(n_epochs):
             start = i * samples_per_epoch
             end = start + samples_per_epoch
-            if end > edr_filtered.size:
+            if end > edr.size:
                 continue
-            segment = edr_filtered[start:end]
-            ratio = bandpower_ratio(
-                segment,
-                edr_fs,
-                band=ctx.config.thresholds.edr_band_hz,
-                total_band=(0.05, 2.0),
+            segment = edr[start:end]
+            rr_psd, band_ratio, peak_prom = _rr_from_psd(
+                segment, edr_fs, ctx.config.thresholds.edr_band_hz
             )
-            quality = int(round(min(255.0, max(0.0, ratio * 255.0))))
-            vib_resp_q[i] = quality
-            if quality < ctx.config.thresholds.rr_quality_min:
-                continue
-            peaks = detect_peaks(segment, edr_fs, min_distance_sec=1.0)
-            if peaks.size < 2:
-                continue
-            peak_times = peaks / edr_fs
-            rr_intervals = np.diff(peak_times)
-            valid_mask = (rr_intervals >= 1.0) & (rr_intervals <= 10.0)
-            if not np.any(valid_mask):
-                continue
-            rr_intervals = rr_intervals[valid_mask]
-            values = 60.0 / rr_intervals
-            if values.size < min_breaths:
-                continue
-            mean_val = float(np.mean(values))
-            if mean_val < min_rr or mean_val > max_rr:
-                continue
-            rr_mean[i] = int(round(min(255, max(0, mean_val))))
-            rr_std[i] = int(round(min(255, max(0, float(np.std(values))))))
-            flags[i] |= 1 << FlagBits.RR_VALID
+            rr_ac, ac_peak = _rr_from_autocorr(segment, edr_fs, ctx.config.thresholds.edr_band_hz)
+            rr_peak = _rr_from_peaks(segment, edr_fs, ctx.config.thresholds.edr_band_hz)
 
-        for i in range(1, n_epochs):
-            if rr_mean[i] == UINT8_UNKNOWN or rr_mean[i - 1] == UINT8_UNKNOWN:
-                drr[i] = INT8_UNKNOWN
+            rr_psd_series[i] = rr_psd
+            rr_ac_series[i] = rr_ac
+            rr_peak_series[i] = rr_peak
+            band_ratio_series[i] = band_ratio
+            peak_prom_series[i] = peak_prom
+            ac_peak_series[i] = ac_peak
+
+            win = int(edr_fs * 10)
+            if win > 0 and segment.size >= win * 2:
+                sub_rr = []
+                for k in range(segment.size // win):
+                    s0 = k * win
+                    s1 = s0 + win
+                    rr_sub, _, _ = _rr_from_psd(
+                        segment[s0:s1], edr_fs, ctx.config.thresholds.edr_band_hz
+                    )
+                    if rr_sub > 0:
+                        sub_rr.append(rr_sub)
+                if len(sub_rr) >= 2:
+                    rr_std_raw[i] = float(np.std(sub_rr))
+
+        band_ratio_norm = _normalize_metric(band_ratio_series)
+        peak_prom_norm = _normalize_metric(peak_prom_series)
+        ac_peak_norm = _normalize_metric(ac_peak_series)
+
+        rr_fused = np.zeros(n_epochs, dtype=np.float32)
+        rr_conf = np.zeros(n_epochs, dtype=np.float32)
+        rr_conf_min = ctx.config.thresholds.rr_conf_min
+        rr_agree_tol = ctx.config.thresholds.rr_agree_tol
+        rr_smooth_alpha = ctx.config.thresholds.rr_smooth_alpha
+        min_rr, max_rr = ctx.config.thresholds.rr_range_bpm
+
+        for i in range(n_epochs):
+            ests = []
+            weights = []
+            if rr_psd_series[i] > 0:
+                ests.append(rr_psd_series[i])
+                weights.append(max(band_ratio_norm[i], peak_prom_norm[i]))
+            if rr_ac_series[i] > 0:
+                ests.append(rr_ac_series[i])
+                weights.append(ac_peak_norm[i] if ac_peak_norm[i] > 0 else 0.5)
+            if rr_peak_series[i] > 0:
+                ests.append(rr_peak_series[i])
+                weights.append(peak_prom_norm[i] if peak_prom_norm[i] > 0 else 0.5)
+
+            if not ests:
+                continue
+
+            ests_arr = np.array(ests, dtype=float)
+            weights_arr = np.array(weights, dtype=float)
+            rr_fused[i] = (
+                float(np.average(ests_arr, weights=weights_arr))
+                if np.sum(weights_arr) > 0
+                else float(np.median(ests_arr))
+            )
+            if len(ests_arr) >= 2:
+                med = float(np.median(ests_arr))
+                mad_val = float(np.median(np.abs(ests_arr - med)))
+                tol = max(rr_agree_tol, 0.1 * med)
+                agree = max(0.0, 1.0 - (mad_val / tol))
             else:
-                delta = int(rr_mean[i]) - int(rr_mean[i - 1])
-                drr[i] = int(max(-128, min(127, delta)))
+                agree = 0.5
+
+            edr_sqi = float(
+                0.4 * band_ratio_norm[i] + 0.4 * peak_prom_norm[i] + 0.2 * ac_peak_norm[i]
+            )
+            rr_conf[i] = float(np.clip(0.6 * edr_sqi + 0.4 * agree, 0.0, 1.0))
+
+        rr_valid_mask = (rr_conf >= rr_conf_min) & (rr_fused > 0)
+        rr_fused = _fill_short_gaps(
+            rr_fused, rr_valid_mask, ctx.config.thresholds.rr_gap_fill_max_epochs
+        )
+
+        prev_rr = 0.0
+        for i in range(n_epochs):
+            rr_val = float(rr_fused[i])
+            if rr_val <= 0:
+                prev_rr = 0.0
+                continue
+            if rr_conf[i] < rr_conf_min:
+                if rr_conf[i] > 0 and prev_rr > 0:
+                    rr_val = rr_smooth_alpha * rr_val + (1.0 - rr_smooth_alpha) * prev_rr
+                else:
+                    prev_rr = 0.0
+                    continue
+            if rr_val < min_rr or rr_val > max_rr:
+                prev_rr = 0.0
+                continue
+            rr_mean[i] = int(round(min(255, max(0, rr_val))))
+            rr_std[i] = int(round(min(255, max(0, rr_std_raw[i]))))
+            if prev_rr > 0:
+                drr[i] = int(max(-128, min(127, rr_val - prev_rr)))
+            prev_rr = rr_val
+            flags[i] |= 1 << FlagBits.RR_VALID
+            vib_resp_q[i] = int(round(min(255.0, max(0.0, rr_conf[i] * 255.0))))
 
         return FeatureOutput(
-            features={
-                "rr_mean": rr_mean,
-                "rr_std": rr_std,
-                "drr": drr,
-                "vib_resp_q": vib_resp_q,
-            },
+            features={"rr_mean": rr_mean, "rr_std": rr_std, "drr": drr, "vib_resp_q": vib_resp_q},
             flags=flags,
         )
+
+
+def _rr_from_psd(
+    edr_seg: np.ndarray, fs: float, band: tuple[float, float]
+) -> tuple[float, float, float]:
+    edr_seg = np.asarray(edr_seg, dtype=np.float32)
+    if edr_seg.size < max(8, int(fs * 2)):
+        return 0.0, 0.0, 0.0
+    edr_seg = edr_seg - np.mean(edr_seg)
+    freqs = np.fft.rfftfreq(edr_seg.size, d=1.0 / fs)
+    pxx = np.abs(np.fft.rfft(edr_seg)) ** 2
+    if freqs.size == 0:
+        return 0.0, 0.0, 0.0
+    inband = (freqs >= band[0]) & (freqs <= band[1])
+    if not np.any(inband):
+        return 0.0, 0.0, 0.0
+    p_in = pxx[inband]
+    total_power = float(np.sum(pxx))
+    band_power = float(np.sum(p_in))
+    if band_power <= 0:
+        return 0.0, 0.0, 0.0
+    f_in = freqs[inband]
+    idx = int(np.argmax(p_in))
+    peak_f = float(f_in[idx])
+    peak_prom = float(p_in[idx] / (np.median(p_in) + 1e-9))
+    band_ratio = float(band_power / (total_power + 1e-9))
+    rr_bpm = peak_f * 60.0
+    return rr_bpm, band_ratio, peak_prom
+
+
+def _rr_from_autocorr(
+    edr_seg: np.ndarray, fs: float, band: tuple[float, float]
+) -> tuple[float, float]:
+    edr_seg = np.asarray(edr_seg, dtype=np.float32)
+    if edr_seg.size < 8:
+        return 0.0, 0.0
+    x = edr_seg - np.mean(edr_seg)
+    corr = np.correlate(x, x, mode="full")[len(x) - 1 :]
+    if corr.size < 2 or corr[0] == 0:
+        return 0.0, 0.0
+    corr = corr / corr[0]
+    min_lag = max(1, int(fs / band[1]))
+    max_lag = min(corr.size - 1, int(fs / band[0]))
+    if max_lag <= min_lag:
+        return 0.0, 0.0
+    segment = corr[min_lag : max_lag + 1]
+    idx = int(np.argmax(segment))
+    lag = min_lag + idx
+    peak_val = float(segment[idx])
+    rr_bpm = 60.0 / (lag / fs)
+    return rr_bpm, peak_val
+
+
+def _rr_from_peaks(edr_seg: np.ndarray, fs: float, band: tuple[float, float]) -> float:
+    edr_seg = np.asarray(edr_seg, dtype=np.float32)
+    if edr_seg.size < 8:
+        return 0.0
+    min_dist = max(1, int(fs / band[1]))
+    peaks = detect_peaks(edr_seg, fs, min_distance_sec=min_dist / fs)
+    if peaks.size < 2:
+        return 0.0
+    intervals = np.diff(peaks) / fs
+    min_period = 1.0 / band[1]
+    max_period = 1.0 / band[0]
+    valid = intervals[(intervals >= min_period) & (intervals <= max_period)]
+    if valid.size == 0:
+        return 0.0
+    return float(60.0 / np.median(valid))
+
+
+def _normalize_metric(values: np.ndarray, p_low: float = 10.0, p_high: float = 90.0) -> np.ndarray:
+    vals = values[np.isfinite(values) & (values > 0)]
+    if vals.size < 5:
+        return np.zeros_like(values, dtype=np.float32)
+    low, high = np.percentile(vals, [p_low, p_high])
+    if high <= low:
+        return np.zeros_like(values, dtype=np.float32)
+    out = (values - low) / (high - low)
+    out = np.clip(out, 0.0, 1.0)
+    out[values <= 0] = 0.0
+    return out.astype(np.float32)
+
+
+def _fill_short_gaps(series: np.ndarray, valid_mask: np.ndarray, max_gap: int) -> np.ndarray:
+    out = series.astype(np.float32).copy()
+    idx = np.where(valid_mask)[0]
+    if idx.size < 2:
+        return out
+    for i in range(idx.size - 1):
+        left = idx[i]
+        right = idx[i + 1]
+        gap = right - left - 1
+        if gap <= 0 or gap > max_gap:
+            continue
+        out[left + 1 : right] = np.interp(
+            np.arange(left + 1, right),
+            [left, right],
+            [out[left], out[right]],
+        ).astype(np.float32)
+    return out

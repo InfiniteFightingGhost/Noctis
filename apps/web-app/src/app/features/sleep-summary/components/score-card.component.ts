@@ -18,6 +18,7 @@ import { ScoreBreakdownSheetComponent } from "./score-breakdown-sheet.component"
         <div class="sleep-summary__score-label">
           {{ summary?.scoreLabel ?? "--" }}
         </div>
+        <div class="sleep-summary__score-meta">Last night</div>
       </div>
       <div class="sleep-summary__score-hint">Tap for details</div>
     </button>

@@ -31,10 +31,9 @@ async def test_timescale_policy_apply() -> None:
     admin = provision_service_client(role="admin")
     headers = build_auth_header(admin)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        dry_run = await client.post("/internal/timescale/dry-run", headers=headers)
-        assert dry_run.status_code == 200
-        apply = await client.post("/internal/timescale/apply", headers=headers)
-        assert apply.status_code == 200
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            dry_run = await client.post("/internal/timescale/dry-run", headers=headers)
+            assert dry_run.status_code == 200
+            apply = await client.post("/internal/timescale/apply", headers=headers)
+            assert apply.status_code == 200

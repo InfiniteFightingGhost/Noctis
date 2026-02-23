@@ -27,6 +27,7 @@ from app.services.inference import predict_windows
 from app.services.feature_stats import compute_daily_feature_stats, merge_feature_stats
 from app.services.windowing import WindowedEpoch, build_windows
 from app.tenants.context import TenantContext, get_tenant_context
+from app.ml.validation import ensure_finite
 
 
 router = APIRouter(tags=["predict"], dependencies=[Depends(require_scopes("read"))])
@@ -51,9 +52,7 @@ def predict(
 
     recording = run_with_db_retry(_recording, operation_name="predict_recording")
     if not recording:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not found")
 
     registry = request.app.state.model_registry
     loaded_model = registry.get_loaded()
@@ -76,17 +75,13 @@ def predict(
         epochs = run_with_db_retry(_epochs, operation_name="predict_epochs")
 
     if not epochs:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No epochs available"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No epochs available")
 
     schema_id = loaded_model.feature_schema.schema_id
     if schema_id is None:
 
         def _schema(session):
-            schema = get_feature_schema_by_version(
-                session, loaded_model.feature_schema.version
-            )
+            schema = get_feature_schema_by_version(session, loaded_model.feature_schema.version)
             if schema is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -109,6 +104,7 @@ def predict(
         else:
             payload_features = epoch.features
         vector = decode_features(payload_features, loaded_model.feature_schema)
+        ensure_finite("features", vector)
         windowed_epochs.append(
             WindowedEpoch(
                 epoch_index=epoch.epoch_index,
@@ -120,7 +116,10 @@ def predict(
 
     window_build_start = time.perf_counter()
     windows = build_windows(
-        windowed_epochs, settings.window_size, settings.allow_window_padding
+        windowed_epochs,
+        settings.window_size,
+        settings.allow_window_padding,
+        epoch_seconds=settings.epoch_seconds,
     )
     WINDOW_BUILD_DURATION.observe(time.perf_counter() - window_build_start)
     if not windows:
@@ -141,23 +140,17 @@ def predict(
     predictions: list[dict[str, Any]] = []
     batch_size = settings.inference_batch_size
     inference_start = time.perf_counter()
-    batch_enabled = (
-        settings.enable_batch_inference if batch_mode is None else batch_mode
-    )
+    batch_enabled = settings.enable_batch_inference if batch_mode is None else batch_mode
     with (
         INFERENCE_DURATION.time(),
         profile_block("inference", window_count=len(windows)),
     ):
         if batch_enabled:
             for idx in range(0, len(windows), batch_size):
-                batch_windows = [
-                    window.tensor for window in windows[idx : idx + batch_size]
-                ]
+                batch_windows = [window.tensor for window in windows[idx : idx + batch_size]]
                 predictions.extend(predict_windows(loaded_model, batch_windows))
         else:
-            predictions = predict_windows(
-                loaded_model, [window.tensor for window in windows]
-            )
+            predictions = predict_windows(loaded_model, [window.tensor for window in windows])
     inference_duration_seconds = time.perf_counter() - inference_start
 
     logging.getLogger("app").info(
@@ -181,14 +174,14 @@ def predict(
             dataset_snapshot_id = None
     daily_feature_stats = compute_daily_feature_stats(windowed_epochs)
     for window, prediction in zip(windows, predictions, strict=True):
-        prediction = prediction  # type: dict[str, Any]
+        prediction_data: dict[str, Any] = prediction
         prediction_items.append(
             PredictionItem(
                 window_start_ts=window.start_ts,
                 window_end_ts=window.end_ts,
-                predicted_stage=str(prediction["predicted_stage"]),
-                confidence=float(prediction["confidence"]),
-                probabilities=prediction["probabilities"],
+                predicted_stage=str(prediction_data["predicted_stage"]),
+                confidence=float(prediction_data["confidence"]),
+                probabilities=prediction_data["probabilities"],
             )
         )
         prediction_rows.append(
@@ -200,13 +193,13 @@ def predict(
                 "model_version": loaded_model.version,
                 "feature_schema_version": loaded_model.feature_schema.version,
                 "dataset_snapshot_id": dataset_snapshot_id,
-                "predicted_stage": str(prediction["predicted_stage"]),
+                "predicted_stage": str(prediction_data["predicted_stage"]),
                 "ground_truth_stage": None,
-                "confidence": float(prediction["confidence"]),
-                "probabilities": prediction["probabilities"],
+                "confidence": float(prediction_data["confidence"]),
+                "probabilities": prediction_data["probabilities"],
             }
         )
-        PREDICTION_CONFIDENCE_HISTOGRAM.observe(float(prediction["confidence"]))
+        PREDICTION_CONFIDENCE_HISTOGRAM.observe(float(prediction_data["confidence"]))
 
     def _insert_predictions(session):
         inserted_count = 0
@@ -234,9 +227,7 @@ def predict(
                     window_start_ts=prediction_rows[0]["window_start_ts"],
                     window_end_ts=prediction_rows[-1]["window_end_ts"],
                     prediction_count=inserted_count,
-                    average_latency_ms=(
-                        inference_duration_seconds * 1000.0 / inserted_count
-                    ),
+                    average_latency_ms=(inference_duration_seconds * 1000.0 / inserted_count),
                 )
             )
 

@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 import anyio
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,6 +18,13 @@ from app.api.devices import router as devices_router
 from app.api.health import router as health_router
 from app.api.ingest import router as ingest_router
 from app.api.models import router as models_router
+from app.api.account import router as account_router
+from app.api.alarm import router as alarm_router
+from app.api.challenges import router as challenges_router
+from app.api.coach import router as coach_router
+from app.api.routines import router as routines_router
+from app.api.search import router as search_router
+from app.api.users import router as users_router
 from app.experiments.router import router as experiments_router
 from app.feature_store.service import (
     ensure_active_schema_from_path,
@@ -150,11 +158,12 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_handler(request: Request, exc: RequestValidationError):
+        detail = jsonable_encoder(exc.errors())
         payload = _error_payload(
             code="validation_error",
             message="Request validation failed",
             classification="client",
-            extra={"detail": exc.errors()},
+            extra={"detail": detail},
         )
         ERROR_COUNT.labels(code="validation_error", classification="client").inc()
         return _error_response(422, payload)
@@ -163,9 +172,7 @@ def create_app() -> FastAPI:
     async def app_error_handler(request: Request, exc: AppError):
         if isinstance(exc, ModelUnavailableError):
             MODEL_UNAVAILABLE_COUNT.inc()
-        ERROR_COUNT.labels(
-            code=exc.detail.code, classification=exc.detail.classification
-        ).inc()
+        ERROR_COUNT.labels(code=exc.detail.code, classification=exc.detail.classification).inc()
         payload = _error_payload(
             code=exc.detail.code,
             message=exc.detail.message,
@@ -198,7 +205,14 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(devices_router, prefix=settings.api_v1_prefix)
+    app.include_router(users_router, prefix=settings.api_v1_prefix)
     app.include_router(recordings_router, prefix=settings.api_v1_prefix)
+    app.include_router(account_router, prefix=settings.api_v1_prefix)
+    app.include_router(alarm_router, prefix=settings.api_v1_prefix)
+    app.include_router(challenges_router, prefix=settings.api_v1_prefix)
+    app.include_router(coach_router, prefix=settings.api_v1_prefix)
+    app.include_router(routines_router, prefix=settings.api_v1_prefix)
+    app.include_router(search_router, prefix=settings.api_v1_prefix)
     app.include_router(ingest_router, prefix=settings.api_v1_prefix)
     app.include_router(predict_router, prefix=settings.api_v1_prefix)
     app.include_router(feature_schemas_router, prefix=settings.api_v1_prefix)

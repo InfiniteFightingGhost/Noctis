@@ -182,15 +182,21 @@ def _collect_stats(db: DbInfo) -> dict[str, dict[str, str]]:
         dbname=db.database,
     ) as conn:
         for table, key_expr in TABLE_CHECKS.items():
-            count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            checksum = conn.execute(
+            count_row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+            if count_row is None:
+                raise ValueError(f"Missing count for table {table}")
+            count = count_row[0]
+            checksum_row = conn.execute(
                 "SELECT md5(string_agg(md5("
                 + key_expr
                 + "::text), '' ORDER BY "
                 + key_expr
                 + ")) FROM "
                 + table
-            ).fetchone()[0]
+            ).fetchone()
+            if checksum_row is None:
+                raise ValueError(f"Missing checksum for table {table}")
+            checksum = checksum_row[0]
             stats[table] = {"count": str(count), "checksum": str(checksum)}
     return stats
 

@@ -17,6 +17,10 @@ describe("findStageAtMinute", () => {
       { startMinFromBedtime: 30, durationMin: 60, stage: "light" as const },
     ];
 
-    expect(findStageAtMinute(bins, 35)).toBe("light");
+    expect(findStageAtMinute(bins, 35)).toEqual({
+      startMinFromBedtime: 30,
+      durationMin: 60,
+      stage: "light",
+    });
   });
 });

@@ -33,6 +33,10 @@ async def test_snapshot_training_lineage_flow(tmp_path: Path) -> None:
     shutil.copytree(Path("models/active"), model_registry / "active")
     os.environ["MODEL_REGISTRY_PATH"] = str(model_registry)
 
+    from app.core import settings as settings_module
+
+    settings_module._get_settings_cached.cache_clear()
+
     _migrate(database_url)
 
     from app.main import create_app
@@ -57,55 +61,54 @@ async def test_snapshot_training_lineage_flow(tmp_path: Path) -> None:
     read_headers = build_auth_header(read_client)
     admin_headers = build_auth_header(admin_client)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        device = (
-            await client.post(
-                "/v1/devices",
-                json={"name": "device-1"},
-                headers=ingest_headers,
-            )
-        ).json()
-        recording = (
-            await client.post(
-                "/v1/recordings",
-                json={
-                    "device_id": device["id"],
-                    "started_at": datetime.now(timezone.utc).isoformat(),
-                },
-                headers=ingest_headers,
-            )
-        ).json()
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            device = (
+                await client.post(
+                    "/v1/devices",
+                    json={"name": "device-1"},
+                    headers=ingest_headers,
+                )
+            ).json()
+            recording = (
+                await client.post(
+                    "/v1/recordings",
+                    json={
+                        "device_id": device["id"],
+                        "started_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                    headers=ingest_headers,
+                )
+            ).json()
 
-        start = datetime.now(timezone.utc)
-        epochs = []
-        for i in range(42):
-            epochs.append(
-                {
-                    "epoch_index": i,
-                    "epoch_start_ts": (start + timedelta(seconds=30 * i)).isoformat(),
-                    "feature_schema_version": "v1",
-                    "features": [0.1] * 10,
-                }
-            )
-        ingest = (
-            await client.post(
-                "/v1/epochs:ingest",
-                headers=ingest_headers,
-                json={"recording_id": recording["id"], "epochs": epochs},
-            )
-        ).json()
-        assert ingest["inserted"] == 21
+            start = datetime.now(timezone.utc)
+            epochs = []
+            for i in range(42):
+                epochs.append(
+                    {
+                        "epoch_index": i,
+                        "epoch_start_ts": (start + timedelta(seconds=30 * i)).isoformat(),
+                        "feature_schema_version": "v1",
+                        "features": [0.1] * 10,
+                    }
+                )
+            ingest = (
+                await client.post(
+                    "/v1/epochs:ingest",
+                    headers=ingest_headers,
+                    json={"recording_id": recording["id"], "epochs": epochs},
+                )
+            ).json()
+            assert ingest["inserted"] == len(epochs)
 
-        predict = (
-            await client.post(
-                "/v1/predict",
-                headers=read_headers,
-                json={"recording_id": recording["id"], "epochs": epochs},
-            )
-        ).json()
-        assert predict["predictions"]
+            predict = (
+                await client.post(
+                    "/v1/predict",
+                    headers=read_headers,
+                    json={"recording_id": recording["id"], "epochs": epochs},
+                )
+            ).json()
+            assert predict["predictions"]
 
     def _label_predictions(session):
         rows = (
@@ -119,9 +122,7 @@ async def test_snapshot_training_lineage_flow(tmp_path: Path) -> None:
             row.ground_truth_stage = labels[idx % len(labels)]
         return len(rows)
 
-    updated = run_with_db_retry(
-        _label_predictions, commit=True, operation_name="label_predictions"
-    )
+    updated = run_with_db_retry(_label_predictions, commit=True, operation_name="label_predictions")
     assert updated > 0
 
     snapshot_dir = tmp_path / "snapshot"
@@ -151,6 +152,7 @@ async def test_snapshot_training_lineage_flow(tmp_path: Path) -> None:
         class_balance="none",
         feature_strategy="mean",
         hyperparameters={},
+        evaluation_split_policy="none",
         version_bump="patch",
     )
     version = run_with_db_retry(
@@ -198,10 +200,7 @@ async def test_snapshot_training_lineage_flow(tmp_path: Path) -> None:
 
     run_with_db_retry(_register, commit=True, operation_name="register_training")
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        reload_response = (
-            await client.post("/v1/models/reload", headers=admin_headers)
-        ).json()
-        assert reload_response["reloaded"] is True
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            reload_response = (await client.post("/v1/models/reload", headers=admin_headers)).json()
+            assert reload_response["reloaded"] is True
