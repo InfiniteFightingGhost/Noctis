@@ -11,6 +11,8 @@ from app.schemas.stress import StressRunRequest, StressRunResponse
 from app.stress.service import IngestConfig, run_ingest_stress, run_inference_stress
 from fastapi import HTTPException, status
 from app.tenants.context import TenantContext, get_tenant_context
+from app.db.session import run_with_db_retry
+from app.feature_store.service import get_active_feature_schema
 
 
 router = APIRouter(tags=["stress"], dependencies=[Depends(require_admin)])
@@ -35,9 +37,13 @@ async def stress_run(
     result: dict[str, object] = {}
 
     if payload.mode in {"ingest", "both"}:
+        schema = run_with_db_retry(
+            lambda session: get_active_feature_schema(session),
+            operation_name="stress_feature_schema",
+        )
         ingest_result = await run_ingest_stress(
             model,
-            feature_schema_version=settings.feature_schema_version,
+            feature_schema_version=schema.version,
             config=IngestConfig(
                 device_count=payload.device_count,
                 hours=payload.hours,

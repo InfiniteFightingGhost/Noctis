@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -91,6 +92,17 @@ class Settings(BaseSettings):
     backup_dir: Path = Path("backups")
 
 
+def _settings_cache_key() -> tuple[str | None, str | None]:
+    return (
+        os.getenv("DATABASE_URL"),
+        os.getenv("PERFORMANCE_SAMPLE_SIZE"),
+    )
+
+
 @lru_cache
-def get_settings() -> Settings:
+def _get_settings_cached(_cache_key: tuple[str | None, str | None]) -> Settings:
     return Settings()
+
+
+def get_settings() -> Settings:
+    return _get_settings_cached(_settings_cache_key())

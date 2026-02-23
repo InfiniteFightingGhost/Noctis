@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.settings import get_settings
 from app.db.models import AuditorReport, Epoch, Prediction, Recording
+from app.feature_store.service import get_active_feature_schema
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class AuditIssue:
 
 def run_audit(session: Session, *, tenant_id: uuid.UUID) -> list[AuditIssue]:
     settings = get_settings()
+    schema = get_active_feature_schema(session)
     issues: list[AuditIssue] = []
     issues.extend(
         _check_missing_epochs(session, tenant_id, settings.audit_max_report_rows)
@@ -34,7 +36,7 @@ def run_audit(session: Session, *, tenant_id: uuid.UUID) -> list[AuditIssue]:
         _check_invalid_feature_schema(
             session,
             tenant_id,
-            settings.feature_schema_version,
+            schema.version,
             settings.audit_max_report_rows,
         )
     )

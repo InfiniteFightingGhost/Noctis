@@ -1,0 +1,15 @@
+in_bed_pct: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+hr_mean: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+hr_std: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+dhr: {'count': 965, 'unknown': 965, 'min': -1.0, 'max': -1.0, 'mean': -1.0, 'std': 0.0}
+rr_mean: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+rr_std: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+drr: {'count': 965, 'unknown': 965, 'min': -1.0, 'max': -1.0, 'mean': -1.0, 'std': 0.0}
+large_move_pct: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+minor_move_pct: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+turnovers_delta: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+apnea_delta: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+flags: {'count': 965, 'unknown': 0, 'min': 32.0, 'max': 32.0, 'mean': 32.0, 'std': 0.0}
+vib_move_pct: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+vib_resp_q: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}
+agree_flags: {'count': 965, 'unknown': 965, 'min': 255.0, 'max': 255.0, 'mean': 255.0, 'std': 0.0}

@@ -1,0 +1,32 @@
+{
+  "record_id": "0d79f4b1-e74f-5e87-8e42-f9dd7112ada5",
+  "start_time": "1536094919.0",
+  "channel_map": {
+    "ecg": "/signals/emg/ECG",
+    "eeg": "/signals/eeg/C3_M2",
+    "eog": "/signals/eog/EOG1",
+    "emg": "/signals/emg/ECG"
+  },
+  "fs_map": {},
+  "warnings": [],
+  "feature_spec_version": "v1",
+  "extractor_version": "0.1.0",
+  "config_hash": "85624d6a5ce7457b0d6bc310b1cdfcd5533ec84a4d14060271ec101d8a814bfc",
+  "feature_order": [
+    "in_bed_pct",
+    "hr_mean",
+    "hr_std",
+    "dhr",
+    "rr_mean",
+    "rr_std",
+    "drr",
+    "large_move_pct",
+    "minor_move_pct",
+    "turnovers_delta",
+    "apnea_delta",
+    "flags",
+    "vib_move_pct",
+    "vib_resp_q",
+    "agree_flags"
+  ]
+}

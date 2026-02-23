@@ -1,0 +1,17 @@
+[
+  "in_bed_pct",
+  "hr_mean",
+  "hr_std",
+  "dhr",
+  "rr_mean",
+  "rr_std",
+  "drr",
+  "large_move_pct",
+  "minor_move_pct",
+  "turnovers_delta",
+  "apnea_delta",
+  "flags",
+  "vib_move_pct",
+  "vib_resp_q",
+  "agree_flags"
+]

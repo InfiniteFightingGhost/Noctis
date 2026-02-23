@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -17,6 +18,7 @@ from app.core.metrics import (
 from app.core.settings import get_settings
 from app.db.models import Epoch, FeatureStatistic, ModelUsageStat, Prediction, Recording
 from app.db.session import run_with_db_retry
+from app.feature_store.service import get_feature_schema_by_version
 from app.ml.feature_decode import decode_features
 from app.schemas.predictions import PredictRequest, PredictResponse, PredictionItem
 from app.monitoring.memory import memory_rss_mb
@@ -78,6 +80,22 @@ def predict(
             status_code=status.HTTP_400_BAD_REQUEST, detail="No epochs available"
         )
 
+    schema_id = loaded_model.feature_schema.schema_id
+    if schema_id is None:
+
+        def _schema(session):
+            schema = get_feature_schema_by_version(
+                session, loaded_model.feature_schema.version
+            )
+            if schema is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Feature schema not registered",
+                )
+            return schema.id
+
+        schema_id = run_with_db_retry(_schema, operation_name="predict_schema")
+
     windowed_epochs: list[WindowedEpoch] = []
     for epoch in epochs:
         schema_version = epoch.feature_schema_version
@@ -96,6 +114,7 @@ def predict(
                 epoch_index=epoch.epoch_index,
                 epoch_start_ts=epoch.epoch_start_ts,
                 features=vector,
+                feature_schema_id=schema_id,
             )
         )
 
@@ -154,6 +173,12 @@ def predict(
 
     prediction_items: list[PredictionItem] = []
     prediction_rows: list[dict[str, Any]] = []
+    dataset_snapshot_id = loaded_model.metadata.get("dataset_snapshot_id")
+    if dataset_snapshot_id:
+        try:
+            dataset_snapshot_id = uuid.UUID(str(dataset_snapshot_id))
+        except ValueError:
+            dataset_snapshot_id = None
     daily_feature_stats = compute_daily_feature_stats(windowed_epochs)
     for window, prediction in zip(windows, predictions, strict=True):
         prediction = prediction  # type: dict[str, Any]
@@ -174,6 +199,7 @@ def predict(
                 "window_end_ts": window.end_ts,
                 "model_version": loaded_model.version,
                 "feature_schema_version": loaded_model.feature_schema.version,
+                "dataset_snapshot_id": dataset_snapshot_id,
                 "predicted_stage": str(prediction["predicted_stage"]),
                 "ground_truth_stage": None,
                 "confidence": float(prediction["confidence"]),

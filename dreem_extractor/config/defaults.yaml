@@ -1,0 +1,52 @@
+feature_spec_version: v1
+epoch_sec: 30
+sentinels:
+  uint8_unknown: 255
+  int8_unknown: -1
+channel_patterns:
+  ecg:
+    - "/signals/emg/ECG"
+    - "/signals/**/ECG"
+    - "/signals/**/ecg"
+    - "/**/ECG"
+  resp:
+    - "/signals/resp/**"
+    - "/signals/**/RESP"
+    - "/signals/**/resp"
+    - "/signals/**/breath"
+  eeg:
+    - "/signals/eeg/**"
+  eog:
+    - "/signals/eog/**"
+  emg:
+    - "/signals/emg/**"
+fs_attr_keys:
+  - sampling_rate
+  - sample_rate
+  - fs
+  - sr
+  - freq
+thresholds:
+  min_beats_per_epoch: 8
+  ecg_sqi_thresh: 0.4
+  ecg_rr_min_sec: 0.25
+  ecg_rr_max_sec: 2.5
+  hr_gap_fill_max_epochs: 2
+  hr_median_window: 5
+  hr_jump_max_delta: 15.0
+  hr_smooth_alpha: 0.3
+  hr_smooth_window: 0
+  hr_range_bpm: [30, 220]
+  rr_range_bpm: [4, 40]
+  rr_conf_min: 0.4
+  rr_agree_tol: 3.0
+  rr_smooth_alpha: 0.4
+  rr_gap_fill_max_epochs: 4
+  rr_quality_min: 20
+  edr_band_hz: [0.1, 0.5]
+  edr_fs: 4.0
+  ecg_band_hz: [0.5, 40.0]
+  resp_band_hz: [0.1, 0.5]
+  min_breaths_per_epoch: 2
+flags:
+  unsupported_fields: true

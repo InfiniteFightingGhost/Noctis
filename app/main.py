@@ -18,6 +18,11 @@ from app.api.health import router as health_router
 from app.api.ingest import router as ingest_router
 from app.api.models import router as models_router
 from app.experiments.router import router as experiments_router
+from app.feature_store.service import (
+    ensure_active_schema_from_path,
+    get_active_feature_schema,
+)
+from app.feature_store.router import router as feature_schemas_router
 from app.promotion.router import router as promotion_router
 from app.replay.router import router as replay_router
 from app.api.predict import router as predict_router
@@ -48,12 +53,27 @@ from app.utils.errors import AppError, ModelUnavailableError, RequestTimeoutErro
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.model_registry.load_active()
-
     def _validate_db(session):
         session.execute(text("SELECT 1"))
 
     run_with_db_retry(_validate_db, operation_name="startup_validation")
+    settings = get_settings()
+
+    def _bootstrap_schema(session):
+        ensure_active_schema_from_path(
+            session,
+            schema_path=settings.model_registry_path
+            / settings.active_model_version
+            / "feature_schema.json",
+            activate=True,
+        )
+
+    run_with_db_retry(
+        _bootstrap_schema,
+        commit=True,
+        operation_name="feature_schema_bootstrap",
+    )
+    app.state.model_registry.load_active()
     yield
 
 
@@ -74,9 +94,16 @@ def create_app() -> FastAPI:
         exempt_paths={"/healthz", "/readyz", "/metrics", "/docs", "/openapi.json"},
     )
 
+    def _schema_provider():
+        return run_with_db_retry(
+            lambda session: get_active_feature_schema(session),
+            operation_name="feature_schema_active",
+        )
+
     app.state.model_registry = ModelRegistry(
         root=settings.model_registry_path,
         active_version=settings.active_model_version,
+        schema_provider=_schema_provider,
     )
 
     @app.middleware("http")
@@ -174,6 +201,7 @@ def create_app() -> FastAPI:
     app.include_router(recordings_router, prefix=settings.api_v1_prefix)
     app.include_router(ingest_router, prefix=settings.api_v1_prefix)
     app.include_router(predict_router, prefix=settings.api_v1_prefix)
+    app.include_router(feature_schemas_router, prefix=settings.api_v1_prefix)
     app.include_router(models_router, prefix=settings.api_v1_prefix)
     app.include_router(experiments_router, prefix=settings.api_v1_prefix)
     app.include_router(promotion_router, prefix=settings.api_v1_prefix)

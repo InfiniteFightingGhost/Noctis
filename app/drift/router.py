@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from app.auth.dependencies import require_scopes
 from app.core.metrics import DRIFT_REQUESTS, DRIFT_SCORE_GAUGE, DRIFT_SEVERITY_GAUGE
 from app.core.settings import get_settings
+from app.feature_store.service import get_active_feature_schema
 from app.db.session import run_with_db_retry
 from app.drift.service import compute_drift
 from app.scheduler.service import enqueue_retrain_job
@@ -119,38 +120,44 @@ def _schedule_retrain(
         settings.retrain_dataset_output_root
         / f"retrain_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     )
-    dataset_config = {
-        "output_dir": str(output_dir),
-        "feature_schema_path": str(settings.retrain_feature_schema_path),
-        "window_size": settings.window_size,
-        "allow_padding": settings.allow_window_padding,
-        "label_strategy": "ground_truth_or_predicted",
-        "balance_strategy": "none",
-        "random_seed": 42,
-        "export_format": "npz",
-        "split": {"train": 0.7, "val": 0.15, "test": 0.15},
-        "filters": {
-            "from_ts": suggested_from.isoformat(),
-            "to_ts": suggested_to.isoformat(),
-            "feature_schema_version": settings.feature_schema_version,
-            "tenant_id": str(tenant_id),
-        },
-    }
-    training_config = {
-        "dataset_dir": str(output_dir),
-        "output_root": str(settings.retrain_model_output_root),
-        "feature_schema_path": str(settings.retrain_feature_schema_path),
-        "model_type": "gradient_boosting",
-        "random_seed": 42,
-        "class_balance": "none",
-        "feature_strategy": "mean",
-        "hyperparameters": {},
-        "search": {"method": "random", "param_grid": {}, "n_iter": 5, "cv_folds": 3},
-        "version_bump": "patch",
-        "experiment_name": settings.retrain_experiment_name,
-    }
 
     def _op(session):
+        schema = get_active_feature_schema(session)
+        dataset_config = {
+            "name": f"retrain_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            "output_dir": str(output_dir),
+            "feature_schema_version": schema.version,
+            "window_size": settings.window_size,
+            "allow_padding": settings.allow_window_padding,
+            "label_strategy": "ground_truth_or_predicted",
+            "balance_strategy": "none",
+            "random_seed": 42,
+            "export_format": "npz",
+            "split": {"train": 0.7, "val": 0.15, "test": 0.15},
+            "filters": {
+                "from_ts": suggested_from.isoformat(),
+                "to_ts": suggested_to.isoformat(),
+                "feature_schema_version": schema.version,
+                "tenant_id": str(tenant_id),
+            },
+        }
+        training_config = {
+            "dataset_dir": str(output_dir),
+            "output_root": str(settings.retrain_model_output_root),
+            "model_type": "gradient_boosting",
+            "random_seed": 42,
+            "class_balance": "none",
+            "feature_strategy": "mean",
+            "hyperparameters": {},
+            "search": {
+                "method": "random",
+                "param_grid": {},
+                "n_iter": 5,
+                "cv_folds": 3,
+            },
+            "version_bump": "patch",
+            "experiment_name": settings.retrain_experiment_name,
+        }
         enqueue_retrain_job(
             session,
             tenant_id=tenant_id,

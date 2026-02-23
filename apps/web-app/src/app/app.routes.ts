@@ -9,6 +9,13 @@ export const APP_ROUTES: Routes = [
       ),
   },
   {
+    path: "sleep-summary",
+    loadChildren: () =>
+      import("./features/sleep-summary/sleep-summary.routes").then(
+        (module) => module.SLEEP_SUMMARY_ROUTES,
+      ),
+  },
+  {
     path: "account",
     loadChildren: () =>
       import("./features/account/account.routes").then(
