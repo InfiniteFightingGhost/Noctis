@@ -17,7 +17,9 @@ import { AppHeaderComponent } from "./app-header.component";
       <main class="app-shell__content">
         <router-outlet />
       </main>
-      <app-bottom-nav />
+      @if (showBottomNav()) {
+        <app-bottom-nav />
+      }
     </div>
   `,
 })
@@ -25,6 +27,7 @@ export class AppShellComponent {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   readonly showHeader = signal(true);
+  readonly showBottomNav = signal(true);
 
   constructor() {
     this.updateHeader(this.router.url);
@@ -37,6 +40,12 @@ export class AppShellComponent {
   }
 
   private updateHeader(url: string): void {
+    if (url.startsWith("/login") || url.startsWith("/signup")) {
+      this.showHeader.set(false);
+      this.showBottomNav.set(false);
+      return;
+    }
+
     const hiddenPrefixes = [
       "/dashboard",
       "/report",
@@ -49,5 +58,6 @@ export class AppShellComponent {
     ];
 
     this.showHeader.set(!hiddenPrefixes.some((prefix) => url.startsWith(prefix)));
+    this.showBottomNav.set(true);
   }
 }

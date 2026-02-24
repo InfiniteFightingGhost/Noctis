@@ -195,11 +195,24 @@
 .chip {
   min-height: var(--tap-size);
   padding: 0 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: transparent;
   color: var(--text-0);
   font-size: 0.85rem;
+}
+
+.chip--danger {
+  border-color: rgba(211, 99, 94, 0.5);
+  color: #ffb5b5;
+}
+
+.chip[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .list-row {
@@ -233,6 +246,45 @@
 .primary-link {
   color: var(--accent-0);
   font-size: 0.85rem;
+}
+
+.form-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.form-field__label {
+  font-size: 0.82rem;
+  color: var(--text-1);
+}
+
+.form-field__input {
+  min-height: var(--tap-size);
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(20, 27, 38, 0.72);
+  color: var(--text-0);
+  padding: 0.5rem 0.75rem;
+}
+
+.form-error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ffb5b5;
+}
+
+.routine-step-edit {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: minmax(0, 2fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) auto;
+  margin-top: 0.85rem;
+}
+
+@media (max-width: 720px) {
+  .routine-step-edit {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {

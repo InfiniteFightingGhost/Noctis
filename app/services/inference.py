@@ -6,7 +6,12 @@ from app.ml.registry import LoadedModel
 from app.ml.validation import prepare_batch
 
 
-def predict_windows(model: LoadedModel, windows: list[np.ndarray]) -> list[dict[str, object]]:
+def predict_windows(
+    model: LoadedModel,
+    windows: list[np.ndarray],
+    *,
+    dataset_id: str | None = None,
+) -> list[dict[str, object]]:
     if not windows:
         return []
     feature_strategy = model.metadata.get("feature_strategy")
@@ -21,7 +26,14 @@ def predict_windows(model: LoadedModel, windows: list[np.ndarray]) -> list[dict[
         feature_dim=model.feature_schema.size,
         window_size=int(window_size),
     )
-    probabilities = model.model.predict_proba(batch)
+    if str(feature_strategy) == "sequence":
+        effective_dataset_id = dataset_id or str(
+            model.metadata.get("inference_dataset_id", "UNKNOWN")
+        )
+        dataset_ids = np.full(batch.shape[0], effective_dataset_id, dtype=object)
+        probabilities = model.model.predict_proba(batch, dataset_ids=dataset_ids)
+    else:
+        probabilities = model.model.predict_proba(batch)
     if not np.isfinite(probabilities).all():
         raise ValueError("Model probabilities contain NaN or Inf")
     predictions: list[dict[str, object]] = []

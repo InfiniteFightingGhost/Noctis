@@ -18,6 +18,10 @@ export class DeviceStore {
   readonly status = signal<DeviceViewState>("loading");
   readonly errorMessage = signal<string | null>(null);
   readonly isFetching = signal(false);
+  readonly claimStatus = signal<"idle" | "pending" | "success" | "error">(
+    "idle",
+  );
+  readonly claimErrorMessage = signal<string | null>(null);
 
   readonly primaryDevice = computed(() => this.devices()[0] ?? null);
   readonly secondaryDevice = computed(() => this.devices()[1] ?? null);
@@ -38,5 +42,49 @@ export class DeviceStore {
     } finally {
       this.isFetching.set(false);
     }
+  }
+
+  async claimDeviceByExternalId(deviceExternalId: string): Promise<void> {
+    const normalizedId = deviceExternalId.trim();
+    if (!normalizedId) {
+      this.claimStatus.set("error");
+      this.claimErrorMessage.set("Device external ID is required.");
+      return;
+    }
+
+    this.claimStatus.set("pending");
+    this.claimErrorMessage.set(null);
+
+    try {
+      const device = await firstValueFrom(
+        this.api.claimDeviceById({
+          deviceExternalId: normalizedId,
+        }),
+      );
+
+      this.devices.update((devices) => {
+        const existingIndex = devices.findIndex(
+          (candidate) => candidate.id === device.id,
+        );
+        if (existingIndex >= 0) {
+          return devices.map((candidate, index) =>
+            index === existingIndex ? device : candidate,
+          );
+        }
+        return [device, ...devices];
+      });
+
+      this.status.set("success");
+      this.claimStatus.set("success");
+    } catch (error) {
+      const parsed = toApiError(error);
+      this.claimErrorMessage.set(parsed.message);
+      this.claimStatus.set("error");
+    }
+  }
+
+  resetClaimState(): void {
+    this.claimStatus.set("idle");
+    this.claimErrorMessage.set(null);
   }
 }

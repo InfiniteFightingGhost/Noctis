@@ -1,0 +1,9 @@
+{
+  "dataset": "isruc",
+  "source_path": "/home/andy/Datasets/isruc/raw/subgroupIII/8/8.rec",
+  "error_code": "E_UNSUPPORTED_REC",
+  "message": "REC inputs are explicitly unsupported",
+  "details": {
+    "path": "/home/andy/Datasets/isruc/raw/subgroupIII/8/8.rec"
+  }
+}

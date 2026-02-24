@@ -1,0 +1,11 @@
+{
+  "dataset": "isruc",
+  "source_path": "/home/andy/Datasets/isruc/raw/subgroupI/91/91.rec",
+  "error_code": "E_QC_FAIL",
+  "message": "Missing required channels",
+  "details": {
+    "missing_required_channels": [
+      "ecg"
+    ]
+  }
+}

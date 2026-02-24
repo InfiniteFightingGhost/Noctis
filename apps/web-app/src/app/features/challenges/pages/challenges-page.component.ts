@@ -53,14 +53,22 @@ import { ChallengesStore } from "../data/challenges.store";
           </div>
 
           <div class="screen__section">
-            <div class="chart-card">
-              <p class="chart-card__summary">{{ goalLabel() }}</p>
-              <div class="stage-viz__bar" aria-hidden="true"></div>
-              <p class="chart-card__summary">{{ progressLabel() }}</p>
-            </div>
+            <p class="screen__sub">Week {{ weekLabel() }}</p>
+
+            @for (challenge of challenges(); track challenge.id) {
+              <div class="list-row">
+                <div>
+                  <strong>{{ challenge.title }}</strong>
+                  <div class="list-row__meta">{{ challenge.description }}</div>
+                </div>
+                <span class="list-row__meta">
+                  {{ challenge.progress_current }}/{{ challenge.progress_target }}
+                </span>
+              </div>
+            }
 
             <div class="screen__cta">
-              <ui-button>Set weekly goal</ui-button>
+              <ui-button (click)="reload()">Refresh progress</ui-button>
               <a class="primary-link" routerLink="/coach">View tips</a>
             </div>
           </div>
@@ -73,19 +81,13 @@ export class ChallengesPageComponent implements OnInit {
   readonly store = inject(ChallengesStore);
   readonly viewState = this.store.status;
 
-  readonly goalLabel = computed(() => {
-    const challenge = this.store.summary()?.challenges[0];
-    if (!challenge) {
-      return "Weekly goal: 5 nights on time";
+  readonly challenges = computed(() => this.store.summary()?.challenges ?? []);
+  readonly weekLabel = computed(() => {
+    const summary = this.store.summary();
+    if (!summary) {
+      return "Unavailable";
     }
-    return `Weekly goal: ${challenge.title}`;
-  });
-  readonly progressLabel = computed(() => {
-    const challenge = this.store.summary()?.challenges[0];
-    if (!challenge) {
-      return "Progress: 3 of 5 nights";
-    }
-    return `Progress: ${challenge.progress_current} of ${challenge.progress_target}`;
+    return `${summary.week_start} to ${summary.week_end}`;
   });
 
   ngOnInit(): void {

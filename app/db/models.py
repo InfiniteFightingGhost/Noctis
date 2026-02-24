@@ -54,6 +54,23 @@ class User(Base):
     devices: Mapped[list["Device"]] = relationship(back_populates="user")
 
 
+class AuthUser(Base):
+    __tablename__ = "auth_users"
+    __table_args__ = (UniqueConstraint("email", name="uq_auth_users_email"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(320))
+    password_hash: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
 class Device(Base):
     __tablename__ = "devices"
     __table_args__ = (
@@ -75,6 +92,31 @@ class Device(Base):
 
     recordings: Mapped[list["Recording"]] = relationship(back_populates="device")
     user: Mapped["User | None"] = relationship(back_populates="devices")
+
+
+class DevicePairingSession(Base):
+    __tablename__ = "device_pairing_sessions"
+    __table_args__ = (
+        Index("ix_device_pairing_sessions_tenant_expires", "tenant_id", "expires_at"),
+        Index("ix_device_pairing_sessions_tenant_code", "tenant_id", "pairing_code"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("devices.id"))
+    pairing_code: Mapped[str] = mapped_column(String(12))
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    claimed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
 
 class Recording(Base):
@@ -578,8 +620,18 @@ class Alarm(Base):
     name: Mapped[str] = mapped_column(String(128))
     scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    wake_time: Mapped[str] = mapped_column(String(5), default="06:45")
+    wake_window_minutes: Mapped[int] = mapped_column(Integer, default=20)
+    sunrise_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    sunrise_intensity: Mapped[int] = mapped_column(Integer, default=3)
+    sound_id: Mapped[str] = mapped_column(String(64), default="ocean")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
 
@@ -598,6 +650,45 @@ class Routine(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    steps: Mapped[list["RoutineStep"]] = relationship(
+        back_populates="routine",
+        cascade="all, delete-orphan",
+        order_by="RoutineStep.position",
+    )
+
+
+class RoutineStep(Base):
+    __tablename__ = "routine_steps"
+    __table_args__ = (
+        Index("ix_routine_steps_routine", "routine_id", "position"),
+        Index("ix_routine_steps_tenant", "tenant_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
+    routine_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("routines.id", ondelete="CASCADE")
+    )
+    title: Mapped[str] = mapped_column(String(128))
+    duration_minutes: Mapped[int] = mapped_column(Integer)
+    emoji: Mapped[str | None] = mapped_column(String(8))
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    routine: Mapped[Routine] = relationship(back_populates="steps")
 
 
 class Challenge(Base):

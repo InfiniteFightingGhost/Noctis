@@ -7,9 +7,10 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.dependencies import require_scopes
+from app.auth.context import AuthContext
+from app.auth.dependencies import get_auth_context, require_scopes
 from app.core.metrics import DEVICE_INGEST_RATE, INGEST_FAILURES, INGEST_REQUESTS
-from app.db.models import Recording
+from app.db.models import Device, Recording
 from app.db.session import run_with_db_retry
 from app.feature_store.service import get_active_feature_schema
 from app.feature_store.schema import FeatureSchemaRecord
@@ -23,6 +24,7 @@ from app.services.device_ingest import (
     store_device_epoch_raw,
 )
 from app.services.ingest import ingest_epochs
+from app.services.user_identity import resolve_or_create_domain_user_for_auth
 from app.tenants.context import TenantContext, get_tenant_context
 
 
@@ -106,6 +108,7 @@ def ingest_epoch_batch(
 def ingest_device_epoch_batch(
     payload: DeviceEpochIngestBatch,
     tenant: TenantContext = Depends(get_tenant_context),
+    auth: AuthContext = Depends(get_auth_context),
 ) -> dict:
     INGEST_REQUESTS.inc()
 
@@ -135,13 +138,16 @@ def ingest_device_epoch_batch(
             )
 
     def _op(session):
-        device = resolve_device(
-            session,
-            tenant_id=tenant.id,
-            device_id=payload.device_id,
-            external_id=payload.device_external_id,
-            name=payload.device_name,
-        )
+        if auth.principal_type == "user":
+            user = resolve_or_create_domain_user_for_auth(session, tenant_id=tenant.id, auth=auth)
+            device = _resolve_existing_device(session, tenant_id=tenant.id, payload=payload)
+            if device is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Device not found"
+                )
+            _ensure_user_device_binding(device_user_id=device.user_id, current_user_id=user.id)
+        else:
+            device = _resolve_service_device(session, tenant_id=tenant.id, payload=payload)
         recording = resolve_recording(
             session,
             tenant_id=tenant.id,
@@ -204,3 +210,49 @@ def ingest_device_epoch_batch(
     except Exception:
         INGEST_FAILURES.inc()
         raise
+
+
+def _resolve_existing_device(
+    session, *, tenant_id, payload: DeviceEpochIngestBatch
+) -> Device | None:
+    query = session.query(Device).filter(Device.tenant_id == tenant_id)
+    if payload.device_id is not None:
+        return query.filter(Device.id == payload.device_id).one_or_none()
+    return query.filter(Device.external_id == payload.device_external_id).one_or_none()
+
+
+def _resolve_service_device(session, *, tenant_id, payload: DeviceEpochIngestBatch) -> Device:
+    existing = _resolve_existing_device(session, tenant_id=tenant_id, payload=payload)
+    if existing is not None:
+        return existing
+    if payload.device_id is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found")
+    if not payload.device_external_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Device identifier is required"
+        )
+    if not payload.device_name:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Device not found; provide device_name to register device",
+        )
+    return resolve_device(
+        session,
+        tenant_id=tenant_id,
+        device_id=None,
+        external_id=payload.device_external_id,
+        name=payload.device_name,
+    )
+
+
+def _ensure_user_device_binding(*, device_user_id, current_user_id) -> None:
+    if device_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Device is not paired to a user",
+        )
+    if device_user_id != current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Device is paired to a different user",
+        )

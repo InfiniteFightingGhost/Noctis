@@ -1,0 +1,200 @@
+{
+  "record_id": "a4568951-bf87-5bbc-bc4f-28e93c360be6",
+  "night_id": "a4568951-bf87-5bbc-bc4f-28e93c360be6",
+  "raw_input_sha256": "b75031f830b7c1d04417c55131971a8058edd99cbb56e61a2474c8879ca2c57f",
+  "extractor_version": "0.2.0",
+  "git_commit": "4ac57936c1985f68da020b3142df3d7c37f2ab83",
+  "config_hash": "b941dae2839dc8548030f5642fc9a6e379d4ffd3eb8c63d3d93741003c4050a0",
+  "schema_hash": "646c35cb245b6985eaad2561397b7dda8d067b40c9eba18c32eecf84a11b5d88",
+  "selected_channels": {
+    "ecg": "/signals/emg/ECG",
+    "eeg": "/signals/eeg/C3_M2",
+    "eog": "/signals/eog/EOG1",
+    "emg": "/signals/emg/ECG"
+  },
+  "fs_per_channel": {
+    "ecg": 250.0,
+    "eeg": 250.0,
+    "eog": 250.0,
+    "emg": 250.0
+  },
+  "staging_source": "/home/andy/Datasets/dodh/dodh/a4568951-bf87-5bbc-bc4f-28e93c360be6.h5",
+  "staging_hash": "b75031f830b7c1d04417c55131971a8058edd99cbb56e61a2474c8879ca2c57f",
+  "alignment_decisions": {
+    "ecg": {
+      "status": "exact",
+      "reason": null,
+      "expected_samples": 7312500,
+      "available_samples": 7312500
+    },
+    "eeg": {
+      "status": "exact",
+      "reason": null,
+      "expected_samples": 7312500,
+      "available_samples": 7312500
+    },
+    "eog": {
+      "status": "exact",
+      "reason": null,
+      "expected_samples": 7312500,
+      "available_samples": 7312500
+    },
+    "emg": {
+      "status": "exact",
+      "reason": null,
+      "expected_samples": 7312500,
+      "available_samples": 7312500
+    }
+  },
+  "qc_summary": {
+    "required_channels": [
+      "ecg"
+    ],
+    "failed_required_channels": [],
+    "optional_failed_channels": []
+  },
+  "class_distribution": {
+    "-1": 0,
+    "0": 250,
+    "1": 83,
+    "2": 385,
+    "3": 132,
+    "4": 125
+  },
+  "feature_list": [
+    {
+      "name": "in_bed_pct",
+      "dtype": "float32",
+      "unit": "pct",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "hr_mean",
+      "dtype": "float32",
+      "unit": "bpm",
+      "required_channels": [
+        "ecg"
+      ],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "hr_std",
+      "dtype": "float32",
+      "unit": "bpm",
+      "required_channels": [
+        "ecg"
+      ],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "dhr",
+      "dtype": "float32",
+      "unit": "bpm",
+      "required_channels": [
+        "ecg"
+      ],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "rr_mean",
+      "dtype": "float32",
+      "unit": "brpm",
+      "required_channels": [
+        "ecg"
+      ],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "rr_std",
+      "dtype": "float32",
+      "unit": "brpm",
+      "required_channels": [
+        "ecg"
+      ],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "drr",
+      "dtype": "float32",
+      "unit": "brpm",
+      "required_channels": [
+        "ecg"
+      ],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "large_move_pct",
+      "dtype": "float32",
+      "unit": "pct",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "minor_move_pct",
+      "dtype": "float32",
+      "unit": "pct",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "turnovers_delta",
+      "dtype": "float32",
+      "unit": "count",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "apnea_delta",
+      "dtype": "float32",
+      "unit": "count",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "flags",
+      "dtype": "float32",
+      "unit": "bitmask",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "zero"
+    },
+    {
+      "name": "vib_move_pct",
+      "dtype": "float32",
+      "unit": "pct",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "vib_resp_q",
+      "dtype": "float32",
+      "unit": "score",
+      "required_channels": [
+        "ecg"
+      ],
+      "causal": true,
+      "missing_policy": "nan"
+    },
+    {
+      "name": "agree_flags",
+      "dtype": "float32",
+      "unit": "bitmask",
+      "required_channels": [],
+      "causal": true,
+      "missing_policy": "zero"
+    }
+  ]
+}

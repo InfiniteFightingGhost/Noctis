@@ -1,0 +1,8 @@
+mode: reconcile
+epoch_sec: 30
+strict:
+  fail_on_length_mismatch: true
+reconcile:
+  allow_truncate: true
+  allow_pad_invalid: true
+  pad_value: null

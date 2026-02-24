@@ -33,6 +33,13 @@ def prepare_batch(
         if int(batch.shape[1]) != window_size:
             raise ValueError("Window tensor has invalid time dimension")
         batch = batch.reshape(batch.shape[0], -1)
+    elif feature_strategy == "sequence":
+        if int(batch.shape[1]) != window_size:
+            raise ValueError("Window tensor has invalid time dimension")
+        if int(batch.shape[2]) != int(expected_input_dim):
+            raise ValueError("Batch feature dimension mismatch")
+        ensure_finite("batch", batch)
+        return batch
     else:
         raise ValueError("Unknown feature strategy")
     ensure_finite("batch", batch)

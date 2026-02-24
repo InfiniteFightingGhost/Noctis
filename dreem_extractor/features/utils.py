@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import butter, filtfilt, find_peaks, welch
+from scipy.signal import butter, find_peaks, lfilter, welch
 
 
 def bandpass_filter(
@@ -13,10 +13,7 @@ def bandpass_filter(
     if high_norm <= 0 or low_norm >= 1 or low_norm >= high_norm:
         return data
     b, a = butter(order, [low_norm, high_norm], btype="band")
-    padlen = 3 * (max(len(a), len(b)) - 1)
-    if data.size <= padlen:
-        return data
-    return filtfilt(b, a, data)
+    return lfilter(b, a, data)
 
 
 def lowpass_filter(data: np.ndarray, fs: float, cutoff: float, order: int = 4) -> np.ndarray:
@@ -25,10 +22,7 @@ def lowpass_filter(data: np.ndarray, fs: float, cutoff: float, order: int = 4) -
     if norm >= 1:
         return data
     b, a = butter(order, norm, btype="low")
-    padlen = 3 * (max(len(a), len(b)) - 1)
-    if data.size <= padlen:
-        return data
-    return filtfilt(b, a, data)
+    return lfilter(b, a, data)
 
 
 def mad(data: np.ndarray) -> float:

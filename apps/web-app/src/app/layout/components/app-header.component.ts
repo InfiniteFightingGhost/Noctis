@@ -1,10 +1,11 @@
 import { Component } from "@angular/core";
 import { RouterLink, RouterLinkActive } from "@angular/router";
+import { UiIconComponent } from "../../shared/ui/icon/icon.component";
 
 @Component({
   selector: "app-header",
   standalone: true,
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, UiIconComponent],
   template: `
     <header class="app-header">
       <div class="app-header__inner">
@@ -15,6 +16,7 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
+            <ui-icon name="dashboard" />
             Dashboard
           </a>
           <a
@@ -22,6 +24,7 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
+            <ui-icon name="report" />
             Report
           </a>
           <a
@@ -29,6 +32,7 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
+            <ui-icon name="coach" />
             Coach
           </a>
           <a
@@ -36,6 +40,7 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
+            <ui-icon name="alarm" />
             Alarm
           </a>
           <a
@@ -43,6 +48,7 @@ import { RouterLink, RouterLinkActive } from "@angular/router";
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
           >
+            <ui-icon name="device" />
             Device
           </a>
         </nav>

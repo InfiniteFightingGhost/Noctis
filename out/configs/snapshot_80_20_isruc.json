@@ -1,0 +1,26 @@
+{
+  "name": "ablation_isruc_80_20",
+  "output_dir": "out/snapshots/ablation_isruc_80_20",
+  "feature_schema_version": "dreem_v1",
+  "window_size": 21,
+  "epoch_seconds": 30,
+  "allow_padding": false,
+  "window_alignment": "epoch_end",
+  "padding_policy": "reject",
+  "label_source_policy": "ground_truth_only",
+  "allow_predicted_labels": false,
+  "split": {
+    "train": 0.8,
+    "val": 0.0,
+    "test": 0.2
+  },
+  "split_strategy": "recording",
+  "split_time_aware": false,
+  "split_purge_gap": 0,
+  "split_block_seconds": null,
+  "random_seed": 42,
+  "export_format": "npz",
+  "filters": {
+    "device_id": "81af09a2-ed9b-416f-b862-cdfeccef4846"
+  }
+}

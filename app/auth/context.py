@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import uuid
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -12,3 +13,4 @@ class AuthContext:
     tenant_id: uuid.UUID
     scopes: set[str]
     key_id: str
+    principal_type: Literal["service", "user"] = "service"

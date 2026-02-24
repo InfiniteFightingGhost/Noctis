@@ -1,0 +1,9 @@
+{
+  "dataset": "cap",
+  "source_path": "/home/andy/Datasets/capslpdb-1.0.0/n16.edf",
+  "error_code": "E_CONTRACT_VIOLATION",
+  "message": "name 'ExtractionError' is not defined",
+  "details": {
+    "exception_type": "NameError"
+  }
+}

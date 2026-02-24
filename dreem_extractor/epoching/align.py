@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from extractor_hardened.alignment import align_signal_deterministic
+from extractor_hardened.contracts import load_contracts
+
 
 def align_signal(
     data: np.ndarray,
@@ -9,19 +12,9 @@ def align_signal(
     n_epochs: int,
     epoch_sec: int,
 ) -> tuple[list[np.ndarray | None], list[str]]:
+    mode = str(load_contracts().alignment_policy.get("mode", "reconcile"))
+    aligned = align_signal_deterministic(data, fs, n_epochs, epoch_sec, mode=mode)
     warnings: list[str] = []
-    samples_per_epoch = int(round(fs * epoch_sec))
-    expected = samples_per_epoch * n_epochs
-    if data.size < expected:
-        warnings.append("signal_shorter_than_hypnogram")
-    if data.size > expected:
-        warnings.append("signal_longer_than_hypnogram")
-    segments: list[np.ndarray | None] = []
-    for i in range(n_epochs):
-        start = i * samples_per_epoch
-        end = start + samples_per_epoch
-        if end > data.size:
-            segments.append(None)
-        else:
-            segments.append(data[start:end])
-    return segments, warnings
+    if aligned.decision.status != "exact":
+        warnings.append("signal_length_reconciled")
+    return aligned.segments, warnings

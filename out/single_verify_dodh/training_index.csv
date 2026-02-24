@@ -1,0 +1,2 @@
+dataset,record_id,source_path,hypnogram_path,artifact_dir,failure_path,recording_db_id,n_epochs,valid_ratio
+dodh,0d79f4b1-e74f-5e87-8e42-f9dd7112ada5,/home/andy/Datasets/dodh/dodh/0d79f4b1-e74f-5e87-8e42-f9dd7112ada5.h5,/hypnogram,/home/andy/Projects/Noctis/out/single_verify_dodh/dodh/0d79f4b1-e74f-5e87-8e42-f9dd7112ada5,,,968,0.996900826446281

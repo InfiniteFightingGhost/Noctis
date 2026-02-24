@@ -1,0 +1,13 @@
+{
+  "dataset": "isruc",
+  "source_path": "/home/andy/Datasets/isruc/raw/subgroupI/11/11.rec",
+  "error_code": "E_CHANNEL_AMBIGUOUS",
+  "message": "Multiple EDF channels matched same alias",
+  "details": {
+    "alias": "x7",
+    "matches": [
+      15,
+      17
+    ]
+  }
+}

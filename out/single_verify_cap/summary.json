@@ -1,0 +1,11 @@
+{
+  "datasets": {
+    "cap": {
+      "records": 1,
+      "epochs": 916,
+      "avg_valid_ratio": 0.9890829694323144
+    }
+  },
+  "total_records": 1,
+  "error_code_counts": {}
+}

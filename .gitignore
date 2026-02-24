@@ -1,7 +1,13 @@
 .env
 .opencode/
 AGENTS.md
+**/AGENTS.md
 agents/
+**/agents/
+**/*agent*.md
+.github/copilot-instructions.md
+.cursorrules
+.cursor/rules/
 docs/
 tools/
 .pytest_cache/

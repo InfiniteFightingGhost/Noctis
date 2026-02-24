@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.dataset.config import DatasetBuildConfig
 from app.dataset.io import export_hdf5, export_parquet, save_npz
-from app.db.models import Epoch, Prediction, Recording
+from app.db.models import Device, Epoch, Prediction, Recording
 from app.db.session import run_with_db_retry
 from app.feature_store.schema import FeatureSchemaRecord
 from app.feature_store.service import get_feature_schema_by_version
@@ -30,6 +30,7 @@ class DatasetBuildResult:
     label_map: list[str]
     window_end_ts: np.ndarray
     recording_ids: np.ndarray
+    dataset_ids: np.ndarray
     splits: dict[str, np.ndarray]
     metadata: dict[str, Any]
 
@@ -56,23 +57,25 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
         feature_schema = _resolve_feature_schema(session, config)
         label_strategy = _resolve_label_strategy(config)
         _validate_label_strategy(label_strategy, config.allow_predicted_labels)
-        epochs = _fetch_epochs(session, config, feature_schema)
+        epochs, recording_dataset_ids = _fetch_epochs(session, config, feature_schema)
         windows, window_meta = _build_windows(epochs, config)
         labels = _fetch_labels(session, config, window_meta, feature_schema.version)
-        X, y, label_sources, window_end_ts, recording_ids = _align_labels(
+        X, y, label_sources, window_end_ts, recording_ids, dataset_ids = _align_labels(
             windows,
             window_meta,
             labels,
             label_strategy=label_strategy,
+            recording_dataset_ids=recording_dataset_ids,
         )
         if X.size == 0:
             raise ValueError("No labeled windows found for dataset")
-        X, y, label_sources, window_end_ts, recording_ids = _balance_classes(
+        X, y, label_sources, window_end_ts, recording_ids, dataset_ids = _balance_classes(
             X,
             y,
             label_sources,
             window_end_ts,
             recording_ids,
+            dataset_ids,
             strategy=config.balance_strategy,
             seed=config.random_seed,
         )
@@ -115,6 +118,7 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
             label_map=label_map,
             window_end_ts=window_end_ts,
             recording_ids=recording_ids,
+            dataset_ids=dataset_ids,
             splits=splits,
             metadata=metadata,
         )
@@ -128,14 +132,16 @@ def _fetch_epochs(
     session: Session,
     config: DatasetBuildConfig,
     feature_schema: FeatureSchemaRecord,
-) -> dict[object, list[WindowedEpoch]]:
+) -> tuple[dict[object, list[WindowedEpoch]], dict[str, str]]:
     query = session.query(
         Epoch.recording_id,
         Epoch.epoch_index,
         Epoch.epoch_start_ts,
         Epoch.feature_schema_version,
         Epoch.features_payload,
+        Device.external_id,
     ).join(Recording, Epoch.recording_id == Recording.id)
+    query = query.outerjoin(Device, Recording.device_id == Device.id)
     filters = config.filters
     if filters.device_id:
         query = query.filter(Recording.device_id == filters.device_id)
@@ -154,7 +160,8 @@ def _fetch_epochs(
     query = query.filter(Epoch.feature_schema_version == feature_schema.version)
     rows = query.order_by(Epoch.recording_id, Epoch.epoch_index, Epoch.epoch_start_ts).all()
     epochs: dict[object, list[WindowedEpoch]] = {}
-    for recording_id, epoch_index, epoch_start_ts, schema_version, payload in rows:
+    recording_dataset_ids: dict[str, str] = {}
+    for recording_id, epoch_index, epoch_start_ts, schema_version, payload, external_id in rows:
         if schema_version != feature_schema.version:
             raise ValueError(
                 f"Feature schema mismatch: expected {feature_schema.version}, got {schema_version}"
@@ -162,6 +169,7 @@ def _fetch_epochs(
         vector = decode_features(payload, feature_schema)
         ensure_finite("features", vector)
         key = recording_id
+        recording_dataset_ids[str(recording_id)] = _infer_dataset_id(external_id)
         epochs.setdefault(key, []).append(
             WindowedEpoch(
                 epoch_index=epoch_index,
@@ -170,7 +178,7 @@ def _fetch_epochs(
                 feature_schema_id=feature_schema.id,
             )
         )
-    return epochs
+    return epochs, recording_dataset_ids
 
 
 def _build_windows(
@@ -253,12 +261,14 @@ def _align_labels(
     labels: dict[tuple[str, datetime], dict[str, Any]],
     *,
     label_strategy: str,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    recording_dataset_ids: dict[str, str],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     X: list[np.ndarray] = []
     y: list[str] = []
     label_sources: list[str] = []
     window_end_ts: list[str] = []
     recording_ids: list[str] = []
+    dataset_ids: list[str] = []
     for tensor, meta in zip(windows, window_meta):
         recording_id = meta.get("recording_id")
         window_ts = meta.get("window_end_ts")
@@ -275,13 +285,16 @@ def _align_labels(
         y.append(label)
         label_sources.append(source)
         window_end_ts.append(window_ts.isoformat())
-        recording_ids.append(str(recording_id))
+        recording_key = str(recording_id)
+        recording_ids.append(recording_key)
+        dataset_ids.append(recording_dataset_ids.get(recording_key, "UNKNOWN"))
     return (
         np.asarray(X, dtype=np.float32),
         np.asarray(y),
         np.asarray(label_sources),
         np.asarray(window_end_ts),
         np.asarray(recording_ids),
+        np.asarray(dataset_ids),
     )
 
 
@@ -304,6 +317,19 @@ def _select_label(label_info: dict[str, Any], label_strategy: str) -> tuple[str 
 def _resolve_label_strategy(config: DatasetBuildConfig) -> str:
     strategy = config.label_source_policy or config.label_strategy
     return str(strategy)
+
+
+def _infer_dataset_id(external_id: str | None) -> str:
+    if not external_id:
+        return "UNKNOWN"
+    value = str(external_id).lower()
+    if "dodh" in value:
+        return "DODH"
+    if "cap" in value:
+        return "CAP"
+    if "isruc" in value:
+        return "ISRUC"
+    return "UNKNOWN"
 
 
 def _validate_label_strategy(label_strategy: str, allow_predicted_labels: bool) -> None:
@@ -359,16 +385,17 @@ def _balance_classes(
     label_sources: np.ndarray,
     window_end_ts: np.ndarray,
     recording_ids: np.ndarray,
+    dataset_ids: np.ndarray,
     *,
     strategy: str,
     seed: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     if strategy == "none":
-        return X, y, label_sources, window_end_ts, recording_ids
+        return X, y, label_sources, window_end_ts, recording_ids, dataset_ids
     rng = np.random.default_rng(seed)
     unique, counts = np.unique(y, return_counts=True)
     if len(unique) == 0:
-        return X, y, label_sources, window_end_ts, recording_ids
+        return X, y, label_sources, window_end_ts, recording_ids, dataset_ids
     target = counts.min() if strategy == "undersample" else counts.max()
     indices: list[int] = []
     for label in unique:
@@ -387,6 +414,7 @@ def _balance_classes(
         label_sources[indices],
         window_end_ts[indices],
         recording_ids[indices],
+        dataset_ids[indices],
     )
 
 
@@ -596,7 +624,8 @@ def _build_split_groups(
         groups.sort(key=lambda item: item["start_ts"])
     else:
         rng = np.random.default_rng(seed)
-        rng.shuffle(groups)
+        order = rng.permutation(len(groups))
+        groups = [groups[int(idx)] for idx in order]
     return groups
 
 
@@ -833,6 +862,7 @@ def _export_dataset(
             label_map=result.label_map,
             window_end_ts=result.window_end_ts,
             recording_ids=result.recording_ids,
+            dataset_ids=result.dataset_ids,
             splits=result.splits,
             metadata=result.metadata,
         )
@@ -848,6 +878,7 @@ def _export_dataset(
             label_map=result.label_map,
             window_end_ts=result.window_end_ts,
             recording_ids=result.recording_ids,
+            dataset_ids=result.dataset_ids,
             splits=result.splits,
             metadata=result.metadata,
             feature_names=feature_schema.feature_names,
@@ -864,6 +895,7 @@ def _export_dataset(
             label_map=result.label_map,
             window_end_ts=result.window_end_ts,
             recording_ids=result.recording_ids,
+            dataset_ids=result.dataset_ids,
             splits=result.splits,
             metadata=result.metadata,
         )

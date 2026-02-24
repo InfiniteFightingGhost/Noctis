@@ -99,11 +99,11 @@ import { ReportStore } from "../data/report.store";
                 <div class="chart-card" aria-hidden="true">
                   <div class="stage-viz__bar"></div>
                   <p class="chart-card__summary">
-                    Awake 6%, Light 52%, Deep 18%, REM 24%
+                    {{ stageSummaryLabel() }}
                   </p>
                 </div>
                 <p class="chart-card__summary">
-                  Summary: You held deep sleep longer in the first cycle.
+                  {{ insightLabel() }}
                 </p>
               </div>
             </details>
@@ -116,7 +116,7 @@ import { ReportStore } from "../data/report.store";
               <div class="screen__section">
                 <div class="chart-card" aria-hidden="true">
                   <div class="stage-viz__bar"></div>
-                  <p class="chart-card__summary">Deep +12m vs last week</p>
+                  <p class="chart-card__summary">{{ trendLabel() }}</p>
                 </div>
               </div>
             </details>
@@ -130,7 +130,7 @@ import { ReportStore } from "../data/report.store";
                 <div class="chart-card" aria-hidden="true">
                   <div class="stage-viz__bar"></div>
                   <p class="chart-card__summary">
-                    Movement: Low overall, peak at 03:10
+                    Movement {{ movementLabel() }}
                   </p>
                 </div>
               </div>
@@ -145,7 +145,7 @@ import { ReportStore } from "../data/report.store";
                 <div class="chart-card" aria-hidden="true">
                   <div class="stage-viz__bar"></div>
                   <p class="chart-card__summary">
-                    Heart rate 52–67 bpm, breathing steady.
+                    Avg HR {{ hrLabel() }}, Avg RR {{ rrLabel() }}.
                   </p>
                 </div>
               </div>
@@ -193,6 +193,34 @@ export class ReportPageComponent implements OnInit {
   readonly deepLabel = computed(() => {
     const pct = this.report()?.metrics.deepPct;
     return pct !== undefined ? `${Math.round(pct)}%` : "—";
+  });
+  readonly stageSummaryLabel = computed(() => {
+    const stages = this.report()?.stages.pct;
+    if (!stages) {
+      return "Stage distribution unavailable";
+    }
+    return `Awake ${stages.awake}%, Light ${stages.light}%, Deep ${stages.deep}%, REM ${stages.rem}%`;
+  });
+  readonly insightLabel = computed(
+    () => this.report()?.insight.text ?? "No summary insight available.",
+  );
+  readonly trendLabel = computed(
+    () => `Sleep score ${this.scoreLabel()} with deep sleep ${this.deepLabel()}.`,
+  );
+  readonly movementLabel = computed(() => {
+    const movement = this.report()?.metrics.movementPct;
+    if (movement == null) {
+      return "unavailable";
+    }
+    return `${movement}% of time in bed`;
+  });
+  readonly hrLabel = computed(() => {
+    const hr = this.report()?.metrics.avgHrBpm;
+    return hr !== undefined ? `${hr} bpm` : "—";
+  });
+  readonly rrLabel = computed(() => {
+    const rr = this.report()?.metrics.avgRrBrpm;
+    return rr !== undefined ? `${rr} brpm` : "—";
   });
 
   ngOnInit(): void {

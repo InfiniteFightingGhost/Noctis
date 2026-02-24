@@ -1,0 +1,11 @@
+{
+  "datasets": {
+    "isruc": {
+      "records": 1,
+      "epochs": 880,
+      "avg_valid_ratio": 1.0
+    }
+  },
+  "total_records": 1,
+  "error_code_counts": {}
+}

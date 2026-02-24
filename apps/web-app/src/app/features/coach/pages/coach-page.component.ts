@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject } from "@angular/core";
 import { RouterLink } from "@angular/router";
-import { UiButtonComponent } from "../../../shared/ui/button/button.component";
 import { UiSkeletonComponent } from "../../../shared/ui/skeleton/skeleton.component";
 import { StatusBannerComponent } from "../../../shared/ui/status-banner/status-banner.component";
 import { StatePanelComponent } from "../../../shared/components/state-panel.component";
@@ -11,7 +10,6 @@ import { CoachStore } from "../data/coach.store";
   standalone: true,
   imports: [
     RouterLink,
-    UiButtonComponent,
     UiSkeletonComponent,
     StatusBannerComponent,
     StatePanelComponent,
@@ -72,27 +70,45 @@ import { CoachStore } from "../data/coach.store";
               <p class="insight-card__text">
                 {{ primaryInsight() }}
               </p>
-              <p class="chart-card__summary">Based on last 7 nights.</p>
+              <p class="chart-card__summary">Generated {{ generatedAtLabel() }}.</p>
             </article>
 
-            <div class="screen__cta">
-              <ui-button>Set Bedtime to 10:15pm</ui-button>
-              <div class="chip-row">
-                <button class="chip" type="button">Relaxing routine</button>
-                <button class="chip" type="button">Optimize alarm</button>
-                <button class="chip" type="button">Why this?</button>
+            @if (additionalInsights().length > 0) {
+              <div class="chart-card">
+                <h3>More recommendations</h3>
+                <ul class="coach-list">
+                  @for (item of additionalInsights(); track item.id) {
+                    <li class="chart-card__summary">{{ item.message }}</li>
+                  }
+                </ul>
               </div>
-            </div>
+            }
 
-            <div class="chip-row" aria-label="Insight feedback">
-              <button class="chip" type="button">👍 Helpful</button>
-              <button class="chip" type="button">👎 Not for me</button>
+            <div class="screen__cta">
+              <a class="sleep-summary__button" routerLink="/routine/edit">
+                Apply to bedtime routine
+              </a>
+              <div class="chip-row">
+                <a class="chip" routerLink="/routine">Routine</a>
+                <a class="chip" routerLink="/alarm">Alarm</a>
+                <a class="chip" routerLink="/report">Night report</a>
+              </div>
             </div>
           </div>
         }
       }
     </section>
   `,
+  styles: [
+    `
+      .coach-list {
+        margin: 0;
+        padding-left: 1rem;
+        display: grid;
+        gap: 0.35rem;
+      }
+    `,
+  ],
 })
 export class CoachPageComponent implements OnInit {
   readonly store = inject(CoachStore);
@@ -102,9 +118,15 @@ export class CoachPageComponent implements OnInit {
   readonly primaryInsight = computed(() => {
     return (
       this.store.summary()?.insights[0]?.message ??
-      "Try going to bed around 10:15pm tonight to support deeper sleep."
+      "No coaching insight available yet."
     );
   });
+  readonly additionalInsights = computed(
+    () => this.store.summary()?.insights.slice(1, 4) ?? [],
+  );
+  readonly generatedAtLabel = computed(
+    () => this.store.summary()?.generated_at ?? "just now",
+  );
 
   ngOnInit(): void {
     void this.store.loadSummary();

@@ -60,35 +60,37 @@ import { DeviceStore } from "../data/device.store";
 
           <div class="screen__section">
             <ui-status-banner
-              variant="syncing"
-              title="Syncing..."
-              message="Last sync 07:42. Keep app open."
+              variant="ok"
+              [title]="syncBannerTitle()"
+              [message]="syncBannerMessage()"
             />
 
-            <div class="list-row">
-              <div>
-                <strong>{{ primaryDeviceName() }}</strong>
-                <div class="list-row__meta">Connected • 82% battery</div>
+            @for (device of devices(); track device.id) {
+              <div class="list-row">
+                <div>
+                  <strong>{{ device.name }}</strong>
+                  <div class="list-row__meta">
+                    {{ device.external_id ? "External ID " + device.external_id : "No external ID" }}
+                  </div>
+                </div>
+                <span class="list-row__meta">
+                  {{ device.user_id ? "Linked" : "Unlinked" }}
+                </span>
               </div>
-              <span class="list-row__meta">Synced</span>
-            </div>
-            <div class="list-row">
-              <div>
-                <strong>{{ secondaryDeviceName() }}</strong>
-                <div class="list-row__meta">Nearby • 64% battery</div>
-              </div>
-              <span class="list-row__meta">Idle</span>
-            </div>
+            }
 
             <div class="chart-card">
               <p class="chart-card__summary">
-                Smart reliability: High (based on signal stability and movement noise)
+                {{ syncBannerMessage() }}
               </p>
-              <div class="stage-viz__bar" aria-hidden="true"></div>
+              <p class="chart-card__summary">{{ deviceCountLabel() }}</p>
             </div>
 
             <div class="screen__cta">
-              <ui-button>Retry Sync</ui-button>
+              <ui-button (click)="reload()">Refresh devices</ui-button>
+              <a class="primary-link" routerLink="/device/claim">
+                Claim by external ID
+              </a>
               <a class="primary-link" routerLink="/device/help">
                 Bluetooth / Wi‑Fi help
               </a>
@@ -102,13 +104,28 @@ import { DeviceStore } from "../data/device.store";
 export class DevicePageComponent implements OnInit {
   readonly store = inject(DeviceStore);
   readonly viewState = this.store.status;
+  readonly devices = this.store.devices;
 
   readonly primaryDeviceName = computed(
     () => this.store.primaryDevice()?.name ?? "Sleep Band",
   );
-  readonly secondaryDeviceName = computed(
-    () => this.store.secondaryDevice()?.name ?? "Bedside Dock",
-  );
+  readonly deviceCountLabel = computed(() => {
+    const count = this.devices().length;
+    return `${count} device${count === 1 ? "" : "s"} registered`;
+  });
+  readonly syncBannerTitle = computed(() => {
+    if (this.store.isFetching()) {
+      return "Refreshing devices";
+    }
+    return "Device registry up to date";
+  });
+  readonly syncBannerMessage = computed(() => {
+    const primaryDevice = this.store.primaryDevice();
+    if (!primaryDevice) {
+      return "No device connected yet.";
+    }
+    return `Primary device: ${primaryDevice.name}`;
+  });
 
   ngOnInit(): void {
     void this.store.loadDevices();

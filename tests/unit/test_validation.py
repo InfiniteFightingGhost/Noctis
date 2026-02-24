@@ -46,3 +46,15 @@ def test_prepare_batch_handles_outlier_values() -> None:
         window_size=4,
     )
     assert batch.shape == (1, 2)
+
+
+def test_prepare_batch_sequence_strategy() -> None:
+    windows = [np.zeros((2, 3), dtype=np.float32), np.ones((2, 3), dtype=np.float32)]
+    batch = prepare_batch(
+        windows,
+        feature_strategy="sequence",
+        expected_input_dim=3,
+        feature_dim=3,
+        window_size=2,
+    )
+    assert batch.shape == (2, 2, 3)

@@ -244,6 +244,7 @@ def _load_snapshot(session: Session, snapshot_id: uuid.UUID) -> DatasetBuildResu
         label_map=label_map,
         window_end_ts=np.asarray(window_end_ts),
         recording_ids=np.asarray(recording_list),
+        dataset_ids=np.full(len(y), "UNKNOWN", dtype=object),
         splits=splits,
         metadata=metadata,
     )
@@ -403,6 +404,7 @@ def _export_snapshot(result: DatasetBuildResult, output_dir: Path, export_format
             label_map=result.label_map,
             window_end_ts=result.window_end_ts,
             recording_ids=result.recording_ids,
+            dataset_ids=result.dataset_ids,
             splits=result.splits,
             metadata=result.metadata,
         )
@@ -416,6 +418,7 @@ def _export_snapshot(result: DatasetBuildResult, output_dir: Path, export_format
             label_map=result.label_map,
             window_end_ts=result.window_end_ts,
             recording_ids=result.recording_ids,
+            dataset_ids=result.dataset_ids,
             splits=result.splits,
             metadata=result.metadata,
             feature_names=feature_names,
@@ -429,6 +432,7 @@ def _export_snapshot(result: DatasetBuildResult, output_dir: Path, export_format
             label_map=result.label_map,
             window_end_ts=result.window_end_ts,
             recording_ids=result.recording_ids,
+            dataset_ids=result.dataset_ids,
             splits=result.splits,
             metadata=result.metadata,
         )

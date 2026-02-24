@@ -17,6 +17,13 @@ export class SearchStore {
 
   readonly results = computed(() => this.response()?.results ?? []);
 
+  updateQuery(query: string): void {
+    this.query.set(query);
+    if (!query.trim()) {
+      this.status.set("idle");
+    }
+  }
+
   async runSearch(query: string): Promise<void> {
     const trimmed = query.trim();
     this.query.set(trimmed);
