@@ -271,22 +271,23 @@ void loop() {
 
   // Handle Serial Commands
   if (Serial.available()) {
-    String cmd = Serial.readStringUntil('\n');
-    cmd.trim();
-    cmd.toUpperCase();
+    String raw_cmd = Serial.readStringUntil('\n');
+    raw_cmd.trim();
+    String cmd_upper = raw_cmd;
+    cmd_upper.toUpperCase();
 
-    if (cmd == "STATUS") {
+    if (cmd_upper == "STATUS") {
       printStatus();
-    } else if (cmd.startsWith("SET_TIME ")) {
-      handleTimeSync(cmd);
-    } else if (cmd == "DEBUG") {
+    } else if (cmd_upper.startsWith("SET_TIME ")) {
+      handleTimeSync(cmd_upper);
+    } else if (cmd_upper == "DEBUG") {
       Serial.println("\n--- DEBUG ---");
       Serial.print("epochIndex:     "); Serial.print(epochIndex); Serial.print("/"); Serial.println(CHUNK_EPOCHS);
       Serial.print("Next epoch in:  "); Serial.print((EPOCH_SECONDS*1000-(millis()-epochStartTime))/1000); Serial.println("s");
       Serial.print("flashWriteAddr: "); Serial.println(flashWriteAddr);
       Serial.print("totalChunks:    "); Serial.println(meta.totalChunks);
       Serial.println("-------------\n");
-    } else if (cmd == "ERASE") {
+    } else if (cmd_upper == "ERASE") {
       Serial.println("!!! This will erase all data. Type 'CONFIRM' to proceed.");
       String confirm = Serial.readStringUntil('\n');
       confirm.trim();
@@ -301,7 +302,7 @@ void loop() {
       } else {
         Serial.println("Cancelled.");
       }
-    } else if (cmd == "WIFI_STATUS") {
+    } else if (cmd_upper == "WIFI_STATUS") {
         Serial.println("\n--- WIFI STATUS ---");
         Serial.print("Connected: "); Serial.println(isWiFiConnected() ? "Yes" : "No");
         if(isWiFiConnected()) {
@@ -309,20 +310,20 @@ void loop() {
           Serial.print("RSSI: "); Serial.println(WiFi.RSSI());
         }
         Serial.println("-------------------\n");
-    } else if (cmd == "API_STATUS") {
+    } else if (cmd_upper == "API_STATUS") {
         printAPIStatus();
-    } else if (cmd == "WIFI_RESET") {
+    } else if (cmd_upper == "WIFI_RESET") {
         Serial.println("Resetting WiFi settings and restarting...");
         setupWiFi(true); // true = force config
-    } else if (cmd.startsWith("SET_API ")) {
-        String url = cmd.substring(8);
+    } else if (cmd_upper.startsWith("SET_API ")) {
+        String url = raw_cmd.substring(8);
         setAPIEndpoint(url);
-    } else if (cmd.startsWith("SET_API_KEY ")) {
-        String key = cmd.substring(12);
+    } else if (cmd_upper.startsWith("SET_API_KEY ")) {
+        String key = raw_cmd.substring(12);
         setAPIKey(key);
-    } else if (cmd == "UPLOAD_NOW") {
+    } else if (cmd_upper == "UPLOAD_NOW") {
         uploadBacklog();
-    } else if (cmd == "WIFI_SCAN") {
+    } else if (cmd_upper == "WIFI_SCAN") {
         Serial.println("Scanning for WiFi networks...");
         int n = WiFi.scanNetworks();
         if (n == 0) {
