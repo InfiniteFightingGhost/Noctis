@@ -1,0 +1,57 @@
+feature_spec_version: v1
+epoch_sec: 30
+channel_aliases:
+  ecg:
+    - ecg1 ecg2
+    - ecg
+    - ekg
+    - ecg1
+    - ecg2
+    - heart rate varia
+  resp:
+    - pleth
+    - torace
+    - thorax
+    - addome
+    - adddome
+    - abdomen
+    - abdo
+    - flusso
+    - flow
+    - cannula
+    - canula
+    - termistore
+  emg:
+    - emg1 emg2
+    - emg emg
+    - emg1
+    - emg2
+    - emg
+    - chin1
+    - chin2
+    - chin
+    - deltoide
+  movement:
+    - position
+    - posizione
+    - dx1 dx2
+    - sx1 sx2
+    - tib dx
+    - tib sx
+    - tib sin
+    - stat
+    - roc loc
+    - loc
+    - roc
+thresholds:
+  min_beats_per_epoch: 8
+  ecg_sqi_thresh: 0.4
+  ecg_rr_min_sec: 0.25
+  ecg_rr_max_sec: 2.5
+  hr_range_bpm: [30, 220]
+  rr_range_bpm: [4, 40]
+  min_breaths_per_epoch: 2
+  ecg_band_hz: [0.5, 40.0]
+  resp_band_hz: [0.1, 0.5]
+  move_minor_quantile: 0.75
+  move_large_quantile: 0.95

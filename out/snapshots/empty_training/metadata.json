@@ -1,0 +1,80 @@
+{
+  "created_at": "2026-02-22T14:57:45.839913+00:00",
+  "dataset_snapshot_id": "9379eb78-f6fe-412d-998e-435b1d230cf8",
+  "dataset_snapshot_checksum": "c824a5240c4db296db86bac0ecd12bfbb36263a65f11c680e7957049f38f06ec",
+  "dataset_snapshot_row_count": 4,
+  "feature_schema_version": "v1",
+  "feature_names": [
+    "delta_power",
+    "theta_power",
+    "alpha_power",
+    "beta_power",
+    "sigma_power",
+    "emg_rms",
+    "eog_variance",
+    "hr_mean",
+    "hrv_rmssd",
+    "motion_index"
+  ],
+  "window_size": 21,
+  "epoch_seconds": 30,
+  "label_strategy": "ground_truth_only",
+  "label_source_policy": "ground_truth_only",
+  "allow_predicted_labels": false,
+  "label_source_counts": {
+    "ground_truth": 4
+  },
+  "padded_window_count": 0,
+  "filters": {
+    "split": {
+      "val": 0.25,
+      "test": 0.25,
+      "train": 0.5
+    },
+    "to_ts": null,
+    "from_ts": null,
+    "device_id": "988b9e50-5ad3-499d-887d-d01e1845403e",
+    "tenant_id": null,
+    "random_seed": 42,
+    "window_size": 21,
+    "recording_id": null,
+    "allow_padding": false,
+    "epoch_seconds": 30,
+    "model_version": null,
+    "label_strategy": "ground_truth_only",
+    "padding_policy": "reject",
+    "split_strategy": "recording",
+    "split_purge_gap": 0,
+    "balance_strategy": "none",
+    "split_time_aware": true,
+    "window_alignment": "epoch_end",
+    "label_source_policy": "ground_truth_only",
+    "split_block_seconds": null,
+    "allow_predicted_labels": false,
+    "feature_schema_version": "v1"
+  },
+  "split_sizes": {
+    "train": 2,
+    "val": 1,
+    "test": 1
+  },
+  "label_map": [
+    "N2",
+    "REM"
+  ],
+  "split_policy": {
+    "split_strategy": "recording",
+    "seed": 42,
+    "grouping_key": "recording_id",
+    "time_aware": true,
+    "purge_gap": 0,
+    "block_seconds": null
+  },
+  "window_alignment": {
+    "end_ts": "epoch_start_plus_duration",
+    "epoch_seconds": 30,
+    "padding_policy": "reject",
+    "alignment": "epoch_end"
+  },
+  "window_stride": 1
+}
