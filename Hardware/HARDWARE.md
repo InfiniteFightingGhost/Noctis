@@ -320,6 +320,31 @@ struct EpochQ15 {
 
 ---
 
+## WiFi and API Communication
+
+The device is equipped with WiFi capabilities, allowing it to upload recorded sleep data directly to a remote server. This functionality can be configured and controlled via a serial connection.
+
+### Features
+- **WiFi Connectivity:** The device can connect to a standard 2.4GHz WiFi network.
+- **API Endpoint Configuration:** A custom API endpoint URL can be set to direct data uploads to any compatible server.
+- **Authentication:** The client supports using a Bearer Token API key for secure communication.
+- **Automatic Backlog Upload:** The device stores data chunks in flash memory and will automatically upload any unsent chunks when a WiFi connection is available.
+
+### Serial Commands
+The following commands can be used over a serial connection (e.g., using the Arduino IDE's Serial Monitor or a terminal program) to manage the WiFi and API settings:
+
+- **`WIFI_STATUS`**: Shows the current WiFi connection status, IP address, and signal strength.
+- **`API_STATUS`**: Displays the configured API endpoint, device ID, and the number of unsent data chunks in the backlog.
+- **`WIFI_RESET`**: Clears saved WiFi credentials and restarts the device in Access Point mode to allow for new configuration.
+- **`WIFI_SCAN`**: Scans for and lists nearby WiFi networks.
+- **`SET_API [url]`**: Sets the API endpoint for data uploads (e.g., `http://your-server.com/api/ingest`).
+- **`SET_API_KEY [key]`**: Sets the Bearer token for API authentication.
+- **`UPLOAD_NOW`**: Manually triggers an upload of all backlogged data.
+
+This wireless capability allows for unattended data collection and integration with a central data analysis backend, complementing the manual USB-based data extraction method.
+
+---
+
 ## Power Considerations
 
 ### Normal Operation
@@ -482,30 +507,24 @@ If designing a 3D-printed or fabricated enclosure:
 2. **Position-dependent:** Radar requires specific placement for HR/RR
 3. **Mattress interference:** Thick/metallic mattresses may block radar
 4. **Wired power only:** No battery option currently implemented
-5. **Manual data extraction:** Requires PC connection, no wireless upload
 
 ### Potential Hardware Upgrades
 
-1. **WiFi Data Upload:**
-   - ESP32 already has WiFi capability
-   - Add firmware to upload chunks to cloud/server
-   - Enable real-time monitoring
-
-2. **Battery Operation:**
+1. **Battery Operation:**
    - Add 18650 Li-ion battery + TP4056 charging module
    - Implement deep sleep for power saving
    - Target 24h+ runtime per charge
 
-3. **Multiple Sensors:**
+2. **Multiple Sensors:**
    - Add temperature/humidity sensor (BME280)
    - Add ambient light sensor (for bedroom darkness tracking)
    - Add sound level sensor (snoring detection)
 
-4. **Improved Radar:**
+3. **Improved Radar:**
    - DFRobot offers newer models with better penetration
    - Consider dual-radar setup for multiple people
 
-5. **Custom PCB:**
+4. **Custom PCB:**
    - Reduce size by 70%
    - Improve reliability vs breadboard/wire connections
    - Enable mass production
@@ -611,7 +630,7 @@ Component datasheets and libraries retain their original licenses.
 
 ---
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Last Updated:** February 2026  
 **Maintainer:** [Your name/team]  
 **Status:** Active Development
