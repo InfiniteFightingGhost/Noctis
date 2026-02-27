@@ -10,10 +10,13 @@ from starlette.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
+from app.auth.api_key import authenticate_hardware_api_key
 from app.auth.service import AuthError, authenticate_token
+from app.auth.context import AuthContext
 from app.core.metrics import AUTH_FAILURE_COUNT
 from app.core.settings import get_settings
 from app.governance.service import record_audit_log_with_retry
+from app.user_auth.security import verify_access_token
 from app.utils.request_id import get_request_id, set_request_id
 
 
@@ -23,10 +26,29 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         self._exempt_paths = exempt_paths or set()
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        if request.method == "OPTIONS":
+            return await call_next(request)
         if request.url.path in self._exempt_paths:
             return await call_next(request)
         authorization = request.headers.get(get_settings().auth_header)
         if not authorization:
+            try:
+                api_key_auth = authenticate_hardware_api_key(request)
+            except AuthError as exc:
+                _log_auth_failure(exc.code, request)
+                response = JSONResponse(
+                    status_code=exc.status_code,
+                    content=_error_payload(
+                        code=exc.code,
+                        message=exc.message,
+                        classification="client",
+                    ),
+                )
+                _set_request_headers(response)
+                return response
+            if api_key_auth is not None:
+                request.state.auth = api_key_auth
+                return await call_next(request)
             _log_auth_failure("missing_token", request)
             response = JSONResponse(
                 status_code=401,
@@ -54,17 +76,20 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         try:
             auth = await anyio.to_thread.run_sync(authenticate_token, token)
         except AuthError as exc:
-            _log_auth_failure(exc.code, request)
-            response = JSONResponse(
-                status_code=exc.status_code,
-                content=_error_payload(
-                    code=exc.code,
-                    message=exc.message,
-                    classification="client",
-                ),
-            )
-            _set_request_headers(response)
-            return response
+            user_auth = _try_authenticate_user_token(token)
+            if user_auth is None:
+                _log_auth_failure(exc.code, request)
+                response = JSONResponse(
+                    status_code=exc.status_code,
+                    content=_error_payload(
+                        code=exc.code,
+                        message=exc.message,
+                        classification="client",
+                    ),
+                )
+                _set_request_headers(response)
+                return response
+            auth = user_auth
         request.state.auth = auth
         return await call_next(request)
 
@@ -130,3 +155,20 @@ def _failure_classification(code: str, classification: str) -> str:
     if code in {"request_timeout", "db_error", "db_circuit_open", "model_unavailable"}:
         return "TRANSIENT"
     return "FATAL"
+
+
+def _try_authenticate_user_token(token: str) -> AuthContext | None:
+    try:
+        claims = verify_access_token(token)
+    except Exception:  # noqa: BLE001
+        return None
+    settings = get_settings()
+    return AuthContext(
+        client_id=claims.subject,
+        client_name=claims.email,
+        role="user",
+        tenant_id=uuid.UUID(settings.default_tenant_id),
+        scopes={"read", "ingest"},
+        key_id="user-auth",
+        principal_type="user",
+    )

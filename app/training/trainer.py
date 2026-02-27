@@ -26,7 +26,7 @@ from app.lineage.service import build_lineage_metadata
 from app.ml.feature_schema import FeatureSchema, load_feature_schema
 from app.reproducibility.hashing import hash_artifact_dir, hash_json
 from app.reproducibility.snapshots import verify_snapshot_checksum
-from app.training.config import TrainingConfig
+from app.training.config import TrainingConfig, cnn_model_payload, cnn_training_payload
 
 
 @dataclass(frozen=True)
@@ -58,64 +58,92 @@ def train_model(
     feature_schema = load_feature_schema(feature_schema_path)
     schema_record = _resolve_feature_schema_record(feature_schema, dataset_metadata)
     _verify_snapshot_integrity(snapshot_id, schema_record, feature_schema, dataset_metadata)
-    X, y, label_map = _prepare_features(dataset, config, feature_schema)
     splits = _extract_splits(dataset)
     train_idx = splits.get("train")
     val_idx = splits.get("val")
     test_idx = splits.get("test")
     if train_idx is None or len(train_idx) == 0:
         raise ValueError("Training split is empty")
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(X[train_idx])
-    y_train = y[train_idx]
-    _ensure_finite("X_train", X_train)
-    sample_weight = _compute_sample_weights(y_train, config.class_balance)
-    estimator = GradientBoostingClassifier(random_state=config.random_seed)
-    estimator = _search_hyperparameters(
-        estimator,
-        X_train,
-        y_train,
-        sample_weight,
-        config,
-    )
-    estimator.fit(X_train, y_train, sample_weight=sample_weight)
-    model_label_map = [str(label) for label in estimator.classes_]
-    if set(model_label_map) != set(label_map):
-        raise ValueError("Estimator classes do not match dataset labels")
-    if config.enforce_label_map_order and model_label_map != label_map:
-        raise ValueError("Estimator label order does not match dataset label_map")
-    label_map = model_label_map
-    metrics: dict[str, Any]
-    if label_strategy and label_strategy != "ground_truth_only":
-        metrics = {
-            "evaluation_split": "none",
-            "evaluation_disabled": True,
-        }
-    elif config.evaluation_split_policy == "none":
-        metrics = {
-            "evaluation_split": "none",
-            "evaluation_disabled": True,
-        }
-    else:
-        if config.evaluation_split_policy == "test_only":
-            eval_idx = test_idx
-        elif config.evaluation_split_policy == "val_or_test":
-            eval_idx = test_idx if test_idx is not None and len(test_idx) > 0 else val_idx
-        else:
-            raise ValueError("Unknown evaluation split policy")
-        if eval_idx is None or len(eval_idx) == 0:
-            raise ValueError("Evaluation split is empty")
-        X_eval = scaler.transform(X[eval_idx])
-        _ensure_finite("X_eval", X_eval)
-        y_eval = y[eval_idx]
-        y_pred = estimator.predict(X_eval)
-        metrics = _evaluate_metrics(y_eval, y_pred, label_map)
-        metrics["evaluation_split"] = "test" if eval_idx is test_idx else "val"
-    metrics_hash = hash_json(metrics)
     artifact_dir = config.output_root / version
     artifact_dir.mkdir(parents=True, exist_ok=False)
-    joblib.dump(estimator, artifact_dir / "model.bin")
-    joblib.dump(scaler, artifact_dir / "scaler.bin")
+    _assert_split_recording_isolation(dataset, splits)
+    split_manifest = _build_split_manifest(dataset, splits)
+    (artifact_dir / "split_manifest.json").write_text(json.dumps(split_manifest, indent=2))
+
+    model_classes: list[str]
+    metrics: dict[str, Any]
+    estimator: Any | None = None
+    if config.model_type == "cnn_bilstm":
+        from app.training.cnn_bilstm import train_cnn_bilstm
+
+        X_seq, y, label_map = _prepare_sequence_features(dataset, config)
+        dataset_ids = _dataset_ids(dataset, len(y))
+        eval_split = _resolve_evaluation_split_name(config, test_idx, val_idx, label_strategy)
+        train_eval_split = eval_split
+        if train_eval_split is None:
+            train_eval_split = "val" if val_idx is not None and len(val_idx) > 0 else "test"
+        output = train_cnn_bilstm(
+            config=config,
+            artifact_dir=artifact_dir,
+            X=X_seq,
+            y=y,
+            label_map=label_map,
+            dataset_ids=dataset_ids,
+            splits=splits,
+            evaluation_split_name=train_eval_split,
+        )
+        metrics = output.metrics
+        if eval_split is None:
+            metrics = {
+                "evaluation_split": "none",
+                "evaluation_disabled": True,
+            }
+        model_classes = output.model_classes
+    elif config.model_type == "gradient_boosting":
+        X, y, label_map = _prepare_features(dataset, config, feature_schema)
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X[train_idx])
+        y_train = y[train_idx]
+        _ensure_finite("X_train", X_train)
+        sample_weight = _compute_sample_weights(y_train, config.class_balance)
+        estimator = GradientBoostingClassifier(random_state=config.random_seed)
+        estimator = _search_hyperparameters(
+            estimator,
+            X_train,
+            y_train,
+            sample_weight,
+            config,
+        )
+        estimator.fit(X_train, y_train, sample_weight=sample_weight)
+        model_label_map = [str(label) for label in estimator.classes_]
+        if set(model_label_map) != set(label_map):
+            raise ValueError("Estimator classes do not match dataset labels")
+        if config.enforce_label_map_order and model_label_map != label_map:
+            raise ValueError("Estimator label order does not match dataset label_map")
+        label_map = model_label_map
+        eval_split = _resolve_evaluation_split_name(config, test_idx, val_idx, label_strategy)
+        if eval_split is None:
+            metrics = {
+                "evaluation_split": "none",
+                "evaluation_disabled": True,
+            }
+        else:
+            eval_idx = test_idx if eval_split == "test" else val_idx
+            if eval_idx is None or len(eval_idx) == 0:
+                raise ValueError("Evaluation split is empty")
+            X_eval = scaler.transform(X[eval_idx])
+            _ensure_finite("X_eval", X_eval)
+            y_eval = y[eval_idx]
+            y_pred = estimator.predict(X_eval)
+            metrics = _evaluate_metrics(y_eval, y_pred, label_map)
+            metrics["evaluation_split"] = eval_split
+        joblib.dump(estimator, artifact_dir / "model.bin")
+        joblib.dump(scaler, artifact_dir / "scaler.bin")
+        model_classes = [str(label) for label in estimator.classes_]
+    else:
+        raise ValueError("Unsupported model_type")
+
+    metrics_hash = hash_json(metrics)
     schema_payload = {
         "id": str(schema_record.id),
         "version": schema_record.version,
@@ -138,17 +166,17 @@ def train_model(
     (artifact_dir / "training_config.json").write_text(
         json.dumps(_config_payload(config), indent=2)
     )
-    label_map_order_hash = hash_json(label_map)
-    (artifact_dir / "label_map.json").write_text(json.dumps(label_map, indent=2))
+    label_map_order_hash = hash_json(model_classes)
+    (artifact_dir / "label_map.json").write_text(json.dumps(model_classes, indent=2))
     artifact_hash = hash_artifact_dir(artifact_dir, exclude_files={"metadata.json"})
     git_commit_hash = _git_commit_hash()
     metadata = _build_metadata(
         config,
         version,
         dataset_metadata,
-        label_map,
+        model_classes,
         feature_schema,
-        estimator=estimator,
+        model_classes,
         snapshot_id=snapshot_id,
         feature_schema_hash=schema_record.hash,
         metrics_hash=metrics_hash,
@@ -161,7 +189,7 @@ def train_model(
         version=version,
         artifact_dir=artifact_dir,
         metrics=metrics,
-        label_map=label_map,
+        label_map=model_classes,
         dataset_snapshot_id=snapshot_id,
         feature_schema_version=feature_schema.version,
         git_commit_hash=git_commit_hash,
@@ -269,12 +297,121 @@ def _prepare_features(
     return X, y, label_map
 
 
+def _prepare_sequence_features(
+    dataset: dict[str, Any],
+    config: TrainingConfig,
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    X = dataset["X"]
+    y = dataset["y"]
+    if X.ndim != 3:
+        raise ValueError("Expected 3D window tensor for sequence strategy")
+    if config.feature_strategy != "sequence":
+        raise ValueError("cnn_bilstm requires sequence feature strategy")
+    label_map = [str(label) for label in dataset.get("label_map", np.unique(y))]
+    label_map = _validate_label_map(label_map, y, enforce_order=config.enforce_label_map_order)
+    X = X.astype(np.float32)
+    y = y.astype(str)
+    return X, y, label_map
+
+
+def _dataset_ids(dataset: dict[str, Any], row_count: int) -> np.ndarray:
+    values = dataset.get("dataset_ids")
+    if values is None:
+        return np.full(row_count, "UNKNOWN", dtype=object)
+    dataset_ids = np.asarray(values).astype(str)
+    if dataset_ids.shape[0] != row_count:
+        raise ValueError("dataset_ids length does not match X")
+    return dataset_ids
+
+
 def _extract_splits(dataset: dict[str, Any]) -> dict[str, np.ndarray | None]:
     return {
         "train": dataset.get("split_train"),
         "val": dataset.get("split_val"),
         "test": dataset.get("split_test"),
     }
+
+
+def _resolve_evaluation_split_name(
+    config: TrainingConfig,
+    test_idx: np.ndarray | None,
+    val_idx: np.ndarray | None,
+    label_strategy: str | None,
+) -> str | None:
+    if label_strategy and label_strategy != "ground_truth_only":
+        return None
+    if config.evaluation_split_policy == "none":
+        return None
+    if config.evaluation_split_policy == "test_only":
+        if test_idx is None or len(test_idx) == 0:
+            raise ValueError("Evaluation split is empty")
+        return "test"
+    if config.evaluation_split_policy == "val_or_test":
+        if test_idx is not None and len(test_idx) > 0:
+            return "test"
+        if val_idx is not None and len(val_idx) > 0:
+            return "val"
+        raise ValueError("Evaluation split is empty")
+    raise ValueError("Unknown evaluation split policy")
+
+
+def _assert_split_recording_isolation(
+    dataset: dict[str, Any],
+    splits: dict[str, np.ndarray | None],
+) -> None:
+    recording_ids = dataset.get("recording_ids")
+    if recording_ids is None:
+        return
+    recordings = np.asarray(recording_ids).astype(str)
+    seen: dict[str, str] = {}
+    for split_name, indices in splits.items():
+        if indices is None:
+            continue
+        for idx in indices:
+            recording = recordings[int(idx)]
+            existing = seen.get(recording)
+            if existing and existing != split_name:
+                raise ValueError("Split leakage detected for recording_id")
+            seen[recording] = split_name
+
+
+def _build_split_manifest(
+    dataset: dict[str, Any],
+    splits: dict[str, np.ndarray | None],
+) -> dict[str, Any]:
+    raw_recording_ids = dataset.get("recording_ids")
+    has_recording_ids = raw_recording_ids is not None
+    recording_ids = (
+        np.asarray(raw_recording_ids).astype(str)
+        if has_recording_ids
+        else np.asarray([], dtype=str)
+    )
+    payload: dict[str, Any] = {
+        "split_sizes": {},
+        "recording_counts": {},
+        "recording_overlap": False,
+        "recording_ids_present": has_recording_ids,
+    }
+    split_recordings: dict[str, set[str]] = {}
+    for split_name, indices in splits.items():
+        if indices is None:
+            payload["split_sizes"][split_name] = 0
+            payload["recording_counts"][split_name] = 0
+            split_recordings[split_name] = set()
+            continue
+        if has_recording_ids:
+            values = {recording_ids[int(idx)] for idx in indices}
+        else:
+            values = {f"row_{int(idx)}" for idx in indices}
+        split_recordings[split_name] = values
+        payload["split_sizes"][split_name] = int(len(indices))
+        payload["recording_counts"][split_name] = int(len(values))
+    names = list(split_recordings.keys())
+    for index, left in enumerate(names):
+        for right in names[index + 1 :]:
+            if split_recordings[left].intersection(split_recordings[right]):
+                payload["recording_overlap"] = True
+    return payload
 
 
 def _compute_sample_weights(y: np.ndarray, balance: str) -> np.ndarray | None:
@@ -370,7 +507,7 @@ def _build_metadata(
     dataset_metadata: dict[str, Any] | None,
     label_map: list[str],
     feature_schema: FeatureSchema,
-    estimator: GradientBoostingClassifier,
+    model_classes: list[str],
     *,
     snapshot_id: str,
     feature_schema_hash: str,
@@ -399,7 +536,7 @@ def _build_metadata(
         "label_map": label_map,
         "label_map_source": "estimator_classes",
         "label_map_order_hash": label_map_order_hash,
-        "model_classes": [str(label) for label in estimator.classes_],
+        "model_classes": model_classes,
         "git_commit_hash": git_commit_hash,
         "metrics_hash": metrics_hash,
         "artifact_hash": artifact_hash,
@@ -408,6 +545,8 @@ def _build_metadata(
         "epoch_seconds": epoch_seconds,
         "window_stride": int(dataset_metadata.get("window_stride") or 1),
         "expected_input_dim": expected_input_dim,
+        "dataset_id_map": {"DODH": 0, "CAP": 1, "ISRUC": 2, "UNKNOWN": 3},
+        "inference_dataset_id": "UNKNOWN",
         "lineage": build_lineage_metadata(
             dataset_snapshot_id=snapshot_id,
             feature_schema_version=feature_schema.version,
@@ -469,6 +608,8 @@ def _config_payload(config: TrainingConfig) -> dict[str, Any]:
         "version_bump": config.version_bump,
         "experiment_name": config.experiment_name,
         "metrics_thresholds": config.metrics_thresholds,
+        "model": cnn_model_payload(config),
+        "training": cnn_training_payload(config),
     }
 
 
@@ -524,6 +665,8 @@ def _expected_input_dim(feature_size: int, feature_strategy: str, window_size: i
         return feature_size
     if feature_strategy == "flatten":
         return feature_size * max(window_size, 1)
+    if feature_strategy == "sequence":
+        return feature_size
     raise ValueError("Unknown feature strategy")
 
 

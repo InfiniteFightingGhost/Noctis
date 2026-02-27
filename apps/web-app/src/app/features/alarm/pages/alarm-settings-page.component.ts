@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from "@angular/core";
+import { Component, OnInit, computed, inject } from "@angular/core";
 import { RouterLink } from "@angular/router";
 import { UiSkeletonComponent } from "../../../shared/ui/skeleton/skeleton.component";
 import { StatusBannerComponent } from "../../../shared/ui/status-banner/status-banner.component";
@@ -66,9 +66,11 @@ import { AlarmStore } from "../data/alarm.store";
 
             <div class="chart-card">
               <p class="chart-card__summary">
-                Reliability: High (based on signal stability and movement noise)
+                Wake time: {{ wakeTimeLabel() }} with {{ wakeWindowLabel() }}
               </p>
-              <div class="stage-viz__bar" aria-hidden="true"></div>
+              <p class="chart-card__summary">
+                Sunrise: {{ sunriseLabel() }}. Sound: {{ soundLabel() }}.
+              </p>
             </div>
 
             <div class="screen__cta">
@@ -85,6 +87,25 @@ import { AlarmStore } from "../data/alarm.store";
 export class AlarmSettingsPageComponent implements OnInit {
   readonly store = inject(AlarmStore);
   readonly viewState = this.store.status;
+  readonly wakeTimeLabel = computed(
+    () => this.store.settings()?.wake_time ?? "--:--",
+  );
+  readonly wakeWindowLabel = computed(() => {
+    const windowMinutes = this.store.settings()?.wake_window_minutes;
+    return windowMinutes ? `${windowMinutes} minute window` : "no wake window";
+  });
+  readonly sunriseLabel = computed(() => {
+    const settings = this.store.settings();
+    if (!settings) {
+      return "Not configured";
+    }
+    return settings.sunrise_enabled
+      ? `Enabled (intensity ${settings.sunrise_intensity})`
+      : "Disabled";
+  });
+  readonly soundLabel = computed(
+    () => this.store.activeSound()?.label ?? "Not selected",
+  );
 
   ngOnInit(): void {
     void this.store.loadSettings();

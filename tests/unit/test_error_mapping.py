@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from app.main import _error_payload, _failure_classification
+from app.utils.error_payloads import error_payload, failure_classification
 
 
 def test_failure_classification_dependency_transient() -> None:
-    assert _failure_classification("db_error", "dependency") == "TRANSIENT"
+    assert failure_classification("db_error", "dependency") == "TRANSIENT"
 
 
 def test_failure_classification_client_fatal() -> None:
-    assert _failure_classification("validation_error", "client") == "FATAL"
+    assert failure_classification("validation_error", "client") == "FATAL"
 
 
 def test_error_payload_includes_failure_classification() -> None:
-    payload = _error_payload(
+    payload = error_payload(
         code="request_timeout",
         message="timeout",
         classification="transient",

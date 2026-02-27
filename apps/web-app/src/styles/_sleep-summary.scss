@@ -193,6 +193,11 @@
 .sleep-summary__button {
   width: 100%;
   min-height: var(--tap-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  text-decoration: none;
   border: none;
   border-radius: 16px;
   font-size: 1rem;
@@ -250,9 +255,9 @@
 .ui-icon {
   width: 18px;
   height: 18px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sleep-summary__button:active {

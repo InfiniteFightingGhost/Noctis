@@ -11,12 +11,12 @@ export const scopesGuard: CanActivateFn = (route) => {
     (route.data?.[SCOPES_DATA_KEY] as string[] | undefined) ?? [];
 
   if (!auth.isAuthenticated()) {
-    return router.parseUrl("/account");
+    return router.parseUrl("/login");
   }
 
   if (requiredScopes.length === 0 || auth.hasScopes(requiredScopes)) {
     return true;
   }
 
-  return router.parseUrl("/account");
+  return router.parseUrl("/dashboard");
 };

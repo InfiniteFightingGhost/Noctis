@@ -1,0 +1,11 @@
+{
+  "datasets": {
+    "dodh": {
+      "records": 1,
+      "epochs": 968,
+      "avg_valid_ratio": 0.996900826446281
+    }
+  },
+  "total_records": 1,
+  "error_code_counts": {}
+}

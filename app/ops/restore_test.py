@@ -2,25 +2,14 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import subprocess
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
 
 import psycopg
 
 from app.core.settings import get_settings
-
-
-@dataclass(frozen=True)
-class DbInfo:
-    host: str
-    port: int
-    user: str
-    password: str
-    database: str
+from app.ops.common import DbInfo, parse_db_url, resolve_compose_command
 
 
 TABLE_CHECKS = {
@@ -30,56 +19,6 @@ TABLE_CHECKS = {
     "epochs": "recording_id || '|' || epoch_start_ts",
     "predictions": "recording_id || '|' || window_end_ts",
 }
-
-
-def _parse_db_url(database_url: str) -> DbInfo:
-    url = urlparse(database_url.replace("postgresql+psycopg", "postgresql"))
-    return DbInfo(
-        host=url.hostname or "localhost",
-        port=int(url.port or 5432),
-        user=url.username or "postgres",
-        password=url.password or "",
-        database=(url.path or "/").lstrip("/") or "postgres",
-    )
-
-
-def _resolve_compose_command(project_root: Path) -> list[str] | None:
-    compose_file = project_root / "docker-compose.yml"
-    if not compose_file.exists():
-        return None
-
-    candidates = (["docker", "compose"], ["docker-compose"])
-    for base in candidates:
-        if shutil.which(base[0]) is None:
-            continue
-        try:
-            subprocess.run(
-                base + ["version"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            continue
-        command = base + [
-            "-f",
-            str(compose_file),
-            "--project-directory",
-            str(project_root),
-        ]
-        try:
-            result = subprocess.run(
-                command + ["ps", "-q", "timescaledb"],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except subprocess.CalledProcessError:
-            continue
-        if result.stdout.strip():
-            return command
-    return None
 
 
 def main() -> None:
@@ -92,7 +31,7 @@ def main() -> None:
     if not backup_path.exists():
         raise FileNotFoundError(backup_path)
 
-    db = _parse_db_url(settings.database_url)
+    db = parse_db_url(settings.database_url)
     temp_db = f"{db.database}_restore_test_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
 
     with psycopg.connect(
@@ -107,7 +46,7 @@ def main() -> None:
 
     try:
         project_root = Path(__file__).resolve().parents[2]
-        compose_command = _resolve_compose_command(project_root)
+        compose_command = resolve_compose_command(project_root)
 
         if compose_command:
             exec_command = compose_command + ["exec", "-T"]

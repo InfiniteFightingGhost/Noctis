@@ -1,15 +1,142 @@
 {
-  "version": "v1",
+  "id": "bf820ff5-80c5-445e-ae6d-0bb9f6d5a4fa",
+  "version": "dreem_v1",
+  "hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
   "features": [
-    "delta_power",
-    "theta_power",
-    "alpha_power",
-    "beta_power",
-    "sigma_power",
-    "emg_rms",
-    "eog_variance",
-    "hr_mean",
-    "hrv_rmssd",
-    "motion_index"
+    {
+      "name": "in_bed_pct",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 0
+    },
+    {
+      "name": "hr_mean",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 1
+    },
+    {
+      "name": "hr_std",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 2
+    },
+    {
+      "name": "dhr",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 3
+    },
+    {
+      "name": "rr_mean",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 4
+    },
+    {
+      "name": "rr_std",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 5
+    },
+    {
+      "name": "drr",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 6
+    },
+    {
+      "name": "large_move_pct",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 7
+    },
+    {
+      "name": "minor_move_pct",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 8
+    },
+    {
+      "name": "turnovers_delta",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 9
+    },
+    {
+      "name": "apnea_delta",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 10
+    },
+    {
+      "name": "flags",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 11
+    },
+    {
+      "name": "vib_move_pct",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 12
+    },
+    {
+      "name": "vib_resp_q",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 13
+    },
+    {
+      "name": "agree_flags",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "dreem_v1",
+      "deprecated_in_version": null,
+      "position": 14
+    }
   ]
 }

@@ -106,10 +106,6 @@ class EDRPlugin(FeaturePlugin):
                 if len(sub_rr) >= 2:
                     rr_std_raw[i] = float(np.std(sub_rr))
 
-        band_ratio_norm = _normalize_metric(band_ratio_series)
-        peak_prom_norm = _normalize_metric(peak_prom_series)
-        ac_peak_norm = _normalize_metric(ac_peak_series)
-
         rr_fused = np.zeros(n_epochs, dtype=np.float32)
         rr_conf = np.zeros(n_epochs, dtype=np.float32)
         rr_conf_min = ctx.config.thresholds.rr_conf_min
@@ -120,15 +116,18 @@ class EDRPlugin(FeaturePlugin):
         for i in range(n_epochs):
             ests = []
             weights = []
+            band_quality = _quality_score(band_ratio_series[i], scale=0.4)
+            peak_quality = _quality_score(peak_prom_series[i], scale=5.0)
+            ac_quality = _quality_score(ac_peak_series[i], scale=0.8)
             if rr_psd_series[i] > 0:
                 ests.append(rr_psd_series[i])
-                weights.append(max(band_ratio_norm[i], peak_prom_norm[i]))
+                weights.append(max(band_quality, peak_quality))
             if rr_ac_series[i] > 0:
                 ests.append(rr_ac_series[i])
-                weights.append(ac_peak_norm[i] if ac_peak_norm[i] > 0 else 0.5)
+                weights.append(ac_quality if ac_quality > 0 else 0.5)
             if rr_peak_series[i] > 0:
                 ests.append(rr_peak_series[i])
-                weights.append(peak_prom_norm[i] if peak_prom_norm[i] > 0 else 0.5)
+                weights.append(peak_quality if peak_quality > 0 else 0.5)
 
             if not ests:
                 continue
@@ -148,15 +147,8 @@ class EDRPlugin(FeaturePlugin):
             else:
                 agree = 0.5
 
-            edr_sqi = float(
-                0.4 * band_ratio_norm[i] + 0.4 * peak_prom_norm[i] + 0.2 * ac_peak_norm[i]
-            )
+            edr_sqi = float(0.4 * band_quality + 0.4 * peak_quality + 0.2 * ac_quality)
             rr_conf[i] = float(np.clip(0.6 * edr_sqi + 0.4 * agree, 0.0, 1.0))
-
-        rr_valid_mask = (rr_conf >= rr_conf_min) & (rr_fused > 0)
-        rr_fused = _fill_short_gaps(
-            rr_fused, rr_valid_mask, ctx.config.thresholds.rr_gap_fill_max_epochs
-        )
 
         prev_rr = 0.0
         for i in range(n_epochs):
@@ -255,33 +247,7 @@ def _rr_from_peaks(edr_seg: np.ndarray, fs: float, band: tuple[float, float]) ->
     return float(60.0 / np.median(valid))
 
 
-def _normalize_metric(values: np.ndarray, p_low: float = 10.0, p_high: float = 90.0) -> np.ndarray:
-    vals = values[np.isfinite(values) & (values > 0)]
-    if vals.size < 5:
-        return np.zeros_like(values, dtype=np.float32)
-    low, high = np.percentile(vals, [p_low, p_high])
-    if high <= low:
-        return np.zeros_like(values, dtype=np.float32)
-    out = (values - low) / (high - low)
-    out = np.clip(out, 0.0, 1.0)
-    out[values <= 0] = 0.0
-    return out.astype(np.float32)
-
-
-def _fill_short_gaps(series: np.ndarray, valid_mask: np.ndarray, max_gap: int) -> np.ndarray:
-    out = series.astype(np.float32).copy()
-    idx = np.where(valid_mask)[0]
-    if idx.size < 2:
-        return out
-    for i in range(idx.size - 1):
-        left = idx[i]
-        right = idx[i + 1]
-        gap = right - left - 1
-        if gap <= 0 or gap > max_gap:
-            continue
-        out[left + 1 : right] = np.interp(
-            np.arange(left + 1, right),
-            [left, right],
-            [out[left], out[right]],
-        ).astype(np.float32)
-    return out
+def _quality_score(value: float, scale: float) -> float:
+    if not np.isfinite(value) or value <= 0 or scale <= 0:
+        return 0.0
+    return float(np.clip(value / scale, 0.0, 1.0))

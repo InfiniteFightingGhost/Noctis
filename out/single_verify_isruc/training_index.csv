@@ -1,0 +1,2 @@
+dataset,record_id,source_path,hypnogram_path,artifact_dir,failure_path,recording_db_id,n_epochs,valid_ratio
+isruc,1,/home/andy/Datasets/isruc/raw/subgroupI/1/1.rec,/home/andy/Datasets/isruc/raw/subgroupI/1/1_1.txt,/home/andy/Projects/Noctis/out/single_verify_isruc/isruc/1,,,880,1.0

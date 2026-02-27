@@ -53,40 +53,23 @@ import { RoutineStore } from "../data/routine.store";
           </div>
 
           <div class="screen__section">
-            <div class="list-row">
-              <div>
-                <strong>Dim lights</strong>
-                <div class="list-row__meta">2 min</div>
+            @for (step of routineSteps(); track step.id) {
+              <div class="list-row">
+                <div>
+                  <strong>{{ step.title }}</strong>
+                  <div class="list-row__meta">
+                    {{ step.duration_minutes }} min
+                  </div>
+                </div>
+                <span>{{ step.emoji || "•" }}</span>
               </div>
-              <span>🕯️</span>
-            </div>
-            <div class="list-row">
-              <div>
-                <strong>Breathing reset</strong>
-                <div class="list-row__meta">4 min</div>
-              </div>
-              <span>🌬️</span>
-            </div>
-            <div class="list-row">
-              <div>
-                <strong>Gentle stretch</strong>
-                <div class="list-row__meta">3 min</div>
-              </div>
-              <span>🧘</span>
-            </div>
-            <div class="list-row">
-              <div>
-                <strong>Sleep soundscape</strong>
-                <div class="list-row__meta">3 min</div>
-              </div>
-              <span>🎧</span>
-            </div>
+            }
 
             <div class="chart-card">
               <p class="chart-card__summary">
-                AI suggested: add a 2-minute journaling step tonight.
+                {{ suggestionLabel() }}
               </p>
-              <button class="chip" type="button">Apply suggestion</button>
+              <a class="chip" routerLink="/routine/edit">Review steps</a>
             </div>
 
             <div class="screen__cta">
@@ -112,6 +95,15 @@ export class RoutinePageComponent implements OnInit {
       return "~12 min total";
     }
     return `~${minutes} min total`;
+  });
+  readonly routineSteps = computed(() => this.store.routine()?.steps ?? []);
+  readonly suggestionLabel = computed(() => {
+    const steps = this.routineSteps();
+    if (steps.length === 0) {
+      return "Add your first wind-down step to build consistency.";
+    }
+    const firstStep = steps[0];
+    return `Start with ${firstStep.title.toLowerCase()} to ease into your routine.`;
   });
 
   ngOnInit(): void {

@@ -24,6 +24,8 @@ from app.api.challenges import router as challenges_router
 from app.api.coach import router as coach_router
 from app.api.routines import router as routines_router
 from app.api.search import router as search_router
+from app.api.sleep_ui import router as sleep_ui_router
+from app.api.tenants import router as tenants_router
 from app.api.users import router as users_router
 from app.experiments.router import router as experiments_router
 from app.feature_store.service import (
@@ -55,6 +57,7 @@ from app.resilience.router import router as resilience_router
 from app.timescale_ops.router import router as timescale_router
 from app.audit.router import router as audit_router
 from app.resilience.faults import is_fault_active
+from app.user_auth.router import router as user_auth_router
 from app.utils.request_id import get_request_id, set_request_id
 from app.utils.errors import AppError, ModelUnavailableError, RequestTimeoutError
 
@@ -99,7 +102,19 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         JWTAuthMiddleware,
-        exempt_paths={"/healthz", "/readyz", "/metrics", "/docs", "/openapi.json"},
+        exempt_paths={
+            "/healthz",
+            "/readyz",
+            "/metrics",
+            "/docs",
+            "/openapi.json",
+            f"{settings.api_v1_prefix}/auth/register",
+            f"{settings.api_v1_prefix}/auth/register/",
+            f"{settings.api_v1_prefix}/auth/login",
+            f"{settings.api_v1_prefix}/auth/login/",
+            f"{settings.api_v1_prefix}/auth/me",
+            f"{settings.api_v1_prefix}/auth/me/",
+        },
     )
 
     def _schema_provider():
@@ -204,6 +219,7 @@ def create_app() -> FastAPI:
         return _error_response(500, payload)
 
     app.include_router(health_router)
+    app.include_router(user_auth_router, prefix=settings.api_v1_prefix)
     app.include_router(devices_router, prefix=settings.api_v1_prefix)
     app.include_router(users_router, prefix=settings.api_v1_prefix)
     app.include_router(recordings_router, prefix=settings.api_v1_prefix)
@@ -213,6 +229,8 @@ def create_app() -> FastAPI:
     app.include_router(coach_router, prefix=settings.api_v1_prefix)
     app.include_router(routines_router, prefix=settings.api_v1_prefix)
     app.include_router(search_router, prefix=settings.api_v1_prefix)
+    app.include_router(sleep_ui_router, prefix=settings.api_v1_prefix)
+    app.include_router(tenants_router, prefix=settings.api_v1_prefix)
     app.include_router(ingest_router, prefix=settings.api_v1_prefix)
     app.include_router(predict_router, prefix=settings.api_v1_prefix)
     app.include_router(feature_schemas_router, prefix=settings.api_v1_prefix)

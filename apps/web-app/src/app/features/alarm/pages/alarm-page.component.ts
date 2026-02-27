@@ -55,7 +55,10 @@ import { AlarmStore } from "../data/alarm.store";
               <h1 class="screen__title">{{ wakeTimeLabel() }}</h1>
               <p class="screen__sub">Tomorrow morning</p>
             </div>
-            <ui-status-chip variant="ok" label="All changes saved" />
+            <ui-status-chip
+              [variant]="store.isSaving() ? 'syncing' : 'ok'"
+              [label]="store.isSaving() ? 'Saving changes' : 'All changes saved'"
+            />
           </div>
 
           <div class="screen__section">
@@ -70,6 +73,7 @@ import { AlarmStore } from "../data/alarm.store";
                 max="45"
                 [value]="wakeWindowMinutes()"
                 aria-label="Wake window minutes"
+                (change)="onWakeWindowChange($event)"
               />
             </div>
 
@@ -82,6 +86,7 @@ import { AlarmStore } from "../data/alarm.store";
                 type="checkbox"
                 [checked]="sunriseEnabled()"
                 aria-label="Sunrise toggle"
+                (change)="onSunriseToggle($event)"
               />
             </div>
 
@@ -96,6 +101,7 @@ import { AlarmStore } from "../data/alarm.store";
                 max="5"
                 [value]="sunriseIntensity()"
                 aria-label="Sunrise intensity"
+                (change)="onSunriseIntensityChange($event)"
               />
             </div>
 
@@ -104,32 +110,28 @@ import { AlarmStore } from "../data/alarm.store";
                 <strong>Alarm sound</strong>
                 <div class="list-row__meta">{{ soundLabel() }}</div>
               </div>
-              <button class="chip" type="button">Preview</button>
+              <span class="list-row__meta">Selected</span>
             </div>
 
-            <div class="list-row">
-              <label>
-                <input
-                  type="radio"
-                  name="sound"
-                  checked
-                  aria-label="Ocean Drift sound"
-                />
-                Ocean Drift
-              </label>
-              <span class="list-row__meta">Calm</span>
-            </div>
-            <div class="list-row">
-              <label>
-                <input
-                  type="radio"
-                  name="sound"
-                  aria-label="Soft Chimes sound"
-                />
-                Soft Chimes
-              </label>
-              <span class="list-row__meta">Bright</span>
-            </div>
+            @for (option of soundOptions(); track option.id) {
+              <div class="list-row">
+                <label>
+                  <input
+                    type="radio"
+                    name="sound"
+                    [checked]="option.id === selectedSoundId()"
+                    [attr.aria-label]="option.label + ' sound'"
+                    (change)="onSoundChange(option.id)"
+                  />
+                  {{ option.label }}
+                </label>
+                <span class="list-row__meta">{{ option.mood ?? "" }}</span>
+              </div>
+            }
+
+            @if (store.errorMessage()) {
+              <p class="form-error" role="alert">{{ store.errorMessage() }}</p>
+            }
 
             <a class="primary-link" routerLink="/alarm/settings">
               Advanced settings
@@ -162,6 +164,10 @@ export class AlarmPageComponent implements OnInit {
   readonly soundLabel = computed(
     () => this.store.activeSound()?.label ?? "Ocean Drift",
   );
+  readonly soundOptions = computed(
+    () => this.store.settings()?.sound_options ?? [],
+  );
+  readonly selectedSoundId = computed(() => this.store.settings()?.sound_id ?? "");
 
   ngOnInit(): void {
     void this.store.loadSettings();
@@ -169,5 +175,30 @@ export class AlarmPageComponent implements OnInit {
 
   reload(): void {
     void this.store.loadSettings();
+  }
+
+  onWakeWindowChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    const value = Number(target.value);
+    if (!Number.isNaN(value)) {
+      void this.store.updateSettings({ wakeWindowMinutes: value });
+    }
+  }
+
+  onSunriseToggle(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    void this.store.updateSettings({ sunriseEnabled: target.checked });
+  }
+
+  onSunriseIntensityChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    const value = Number(target.value);
+    if (!Number.isNaN(value)) {
+      void this.store.updateSettings({ sunriseIntensity: value });
+    }
+  }
+
+  onSoundChange(soundId: string): void {
+    void this.store.updateSettings({ soundId });
   }
 }

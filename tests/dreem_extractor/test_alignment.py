@@ -23,4 +23,4 @@ def test_alignment_warning_on_short_signal(tmp_path):
 
     config = load_config()
     result = extract_record(path, config)
-    assert "signal_shorter_than_hypnogram" in result.warnings
+    assert "signal_length_reconciled" in result.warnings

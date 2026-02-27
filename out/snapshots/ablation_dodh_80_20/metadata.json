@@ -1,0 +1,105 @@
+{
+  "created_at": "2026-02-24T13:07:22.551424+00:00",
+  "window_size": 21,
+  "epoch_seconds": 30,
+  "allow_padding": false,
+  "padding_policy": "reject",
+  "feature_schema_version": "dreem_v1",
+  "feature_schema_id": "bf820ff5-80c5-445e-ae6d-0bb9f6d5a4fa",
+  "feature_schema_hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
+  "feature_names": [
+    "in_bed_pct",
+    "hr_mean",
+    "hr_std",
+    "dhr",
+    "rr_mean",
+    "rr_std",
+    "drr",
+    "large_move_pct",
+    "minor_move_pct",
+    "turnovers_delta",
+    "apnea_delta",
+    "flags",
+    "vib_move_pct",
+    "vib_resp_q",
+    "agree_flags"
+  ],
+  "feature_schema_path": null,
+  "git_commit_hash": "4ac57936c1985f68da020b3142df3d7c37f2ab83",
+  "filters": {
+    "from_ts": null,
+    "to_ts": null,
+    "device_id": "28302775-72d3-45ea-9fb1-d33b41ea6914",
+    "recording_id": null,
+    "feature_schema_version": null,
+    "model_version": null,
+    "tenant_id": null
+  },
+  "label_strategy": "ground_truth_only",
+  "label_source_policy": "ground_truth_only",
+  "allow_predicted_labels": false,
+  "label_source_counts": {
+    "ground_truth": 30418
+  },
+  "padded_window_count": 0,
+  "balance_strategy": "none",
+  "random_seed": 42,
+  "split_sizes": {
+    "train": 24650,
+    "val": 0,
+    "test": 5768
+  },
+  "label_map": [
+    "N1",
+    "N2",
+    "N3",
+    "REM",
+    "W"
+  ],
+  "split_policy": {
+    "split_strategy": "recording",
+    "seed": 42,
+    "grouping_key": "recording_id",
+    "time_aware": false,
+    "purge_gap": 0,
+    "block_seconds": null
+  },
+  "window_alignment": {
+    "end_ts": "epoch_start_plus_duration",
+    "epoch_seconds": 30,
+    "padding_policy": "reject",
+    "alignment": "epoch_end"
+  },
+  "window_stride": 1,
+  "dataset_snapshot_id": "0a5f219e-319e-4012-8aeb-e9ace6fbb925",
+  "dataset_snapshot_checksum": "afb17c2edf794496bdd1aefc60a824bbe3b60d2eddb354ba31c3d1b7c5275993",
+  "dataset_snapshot_row_count": 30418,
+  "recording_filter": {
+    "from_ts": null,
+    "to_ts": null,
+    "device_id": "28302775-72d3-45ea-9fb1-d33b41ea6914",
+    "recording_id": null,
+    "feature_schema_version": "dreem_v1",
+    "model_version": null,
+    "tenant_id": null,
+    "window_size": 21,
+    "epoch_seconds": 30,
+    "allow_padding": false,
+    "window_alignment": "epoch_end",
+    "padding_policy": "reject",
+    "label_source_policy": "ground_truth_only",
+    "label_strategy": "ground_truth_only",
+    "allow_predicted_labels": false,
+    "balance_strategy": "none",
+    "random_seed": 42,
+    "split_strategy": "recording",
+    "split_time_aware": false,
+    "split_purge_gap": 0,
+    "split_block_seconds": null,
+    "split": {
+      "train": 0.8,
+      "val": 0.0,
+      "test": 0.2
+    }
+  }
+}

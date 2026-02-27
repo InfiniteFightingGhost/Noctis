@@ -1,0 +1,45 @@
+dataset_dir: out/snapshots/pretrain_80_20
+output_root: models
+feature_schema_path: out/snapshots/pretrain_80_20/feature_schema.json
+model_type: cnn_bilstm
+feature_strategy: sequence
+random_seed: 42
+split_strategy: recording
+split_seed: 42
+split_grouping_key: recording_id
+split_time_aware: false
+evaluation_split_policy: val_or_test
+enforce_label_map_order: true
+
+model:
+  use_dataset_conditioning: true
+  conditioning_mode: onehot
+  conditioning_embed_dim: 8
+  conv_channels: [32, 64]
+  conv_kernel_size: 3
+  conv_dropout: 0.15
+  lstm_hidden_size: 64
+  lstm_layers: 1
+  lstm_dropout: 0.1
+  head_hidden_dims: [64]
+  head_dropout: 0.3
+
+training:
+  batch_size: 128
+  max_epochs: 12
+  early_stopping_patience: 3
+  early_stopping_min_delta: 0.001
+  loss_type: weighted_ce
+  focal_gamma: 2.0
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  optimizer_beta1: 0.9
+  optimizer_beta2: 0.999
+  scheduler_type: plateau
+  scheduler_factor: 0.5
+  scheduler_patience: 2
+  scheduler_min_lr: 1.0e-6
+  gradient_clip_norm: 1.0
+  instability_macro_f1_threshold: 0.15
+  n2_class_weight_multiplier: 0.85
+  enable_domain_transfer_tests: false

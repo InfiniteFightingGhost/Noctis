@@ -10,6 +10,10 @@ export type DeviceUserLinkPayload = {
   userId: string;
 };
 
+export type DeviceClaimByIdPayload = {
+  deviceExternalId: string;
+};
+
 export type DeviceResponse = {
   id: string;
   name: string;
@@ -41,5 +45,11 @@ export class DevicesApi {
 
   getDevices() {
     return this.api.get<DeviceResponse[]>("/v1/devices");
+  }
+
+  claimDeviceById(payload: DeviceClaimByIdPayload) {
+    return this.api.post<DeviceResponse>("/v1/devices/claim-by-id", {
+      device_external_id: payload.deviceExternalId,
+    });
   }
 }

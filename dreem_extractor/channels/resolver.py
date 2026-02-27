@@ -5,6 +5,7 @@ import h5py
 
 from dreem_extractor.config import ExtractConfig
 from dreem_extractor.io.h5_reader import iter_datasets
+from extractor_hardened.errors import ExtractionError
 
 
 def resolve_channels(
@@ -14,7 +15,7 @@ def resolve_channels(
     channel_map: dict[str, str] = {}
     fs_map: dict[str, float] = {}
     for logical, patterns in config.channel_patterns.items():
-        match = _match_first(paths, patterns)
+        match = _match_first(logical, paths, patterns)
         if match is None:
             continue
         channel_map[logical] = match
@@ -27,11 +28,20 @@ def resolve_channels(
     return channel_map, fs_map
 
 
-def _match_first(paths: list[str], patterns: list[str]) -> str | None:
+def _match_first(logical: str, paths: list[str], patterns: list[str]) -> str | None:
+    strict_ambiguity = logical in {"ecg"}
     for pattern in patterns:
-        for path in paths:
-            if fnmatch.fnmatch(path, pattern):
-                return path
+        matches = sorted(path for path in paths if fnmatch.fnmatch(path, pattern))
+        if len(matches) > 1:
+            if strict_ambiguity:
+                raise ExtractionError(
+                    code="E_CHANNEL_AMBIGUOUS",
+                    message="Multiple H5 channels matched same pattern",
+                    details={"logical": logical, "pattern": pattern, "matches": matches},
+                )
+            return matches[0]
+        if matches:
+            return matches[0]
     return None
 
 

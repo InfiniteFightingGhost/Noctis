@@ -16,7 +16,14 @@ from app.core.metrics import (
     WINDOW_BUILD_DURATION,
 )
 from app.core.settings import get_settings
-from app.db.models import Epoch, FeatureStatistic, ModelUsageStat, Prediction, Recording
+from app.db.models import (
+    DatasetSnapshot,
+    Epoch,
+    FeatureStatistic,
+    ModelUsageStat,
+    Prediction,
+    Recording,
+)
 from app.db.session import run_with_db_retry
 from app.feature_store.service import get_feature_schema_by_version
 from app.ml.feature_decode import decode_features
@@ -171,6 +178,14 @@ def predict(
         try:
             dataset_snapshot_id = uuid.UUID(str(dataset_snapshot_id))
         except ValueError:
+            dataset_snapshot_id = None
+    if dataset_snapshot_id is not None:
+
+        def _snapshot_exists(session) -> bool:
+            return session.get(DatasetSnapshot, dataset_snapshot_id) is not None
+
+        exists = run_with_db_retry(_snapshot_exists, operation_name="predict_snapshot_lookup")
+        if not exists:
             dataset_snapshot_id = None
     daily_feature_stats = compute_daily_feature_stats(windowed_epochs)
     for window, prediction in zip(windows, predictions, strict=True):

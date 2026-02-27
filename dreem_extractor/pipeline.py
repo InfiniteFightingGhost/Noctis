@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
 from dreem_extractor.channels.normalization import normalize_signal
-from dreem_extractor.config import ExtractConfig
+from dreem_extractor.config import ExtractConfig, as_dict as config_as_dict
 from dreem_extractor.constants import (
     AgreeBits,
     FEATURE_ORDER,
@@ -13,7 +14,6 @@ from dreem_extractor.constants import (
     INT8_UNKNOWN,
     UINT8_UNKNOWN,
 )
-from dreem_extractor.epoching.align import align_signal
 from dreem_extractor.features.base import FeatureContext
 from dreem_extractor.features.hr_ecg import ECGHRPlugin
 from dreem_extractor.features.rr_edr import EDRPlugin
@@ -23,10 +23,16 @@ from dreem_extractor.io.h5_reader import open_h5, read_dataset
 from dreem_extractor.io.schema import build_manifest
 from dreem_extractor.models import ExtractResult, SignalSeries
 from dreem_extractor.qc.metrics import compute_qc
+from extractor_hardened.alignment import align_signal_deterministic
+from extractor_hardened.contracts import load_contracts
+from extractor_hardened.errors import ExtractionError
+from extractor_hardened.qc import run_qc
 
 
 def extract_record(path: str | Path, config: ExtractConfig) -> ExtractResult:
     path = Path(path)
+    contracts = load_contracts()
+    alignment_mode = str(contracts.alignment_policy.get("mode", "reconcile"))
     warnings: list[str] = []
     with open_h5(path) as h5file:
         manifest = build_manifest(path, h5file, config)
@@ -36,19 +42,47 @@ def extract_record(path: str | Path, config: ExtractConfig) -> ExtractResult:
         n_epochs = int(hypnogram.shape[0])
 
         signals: dict[str, SignalSeries] = {}
+        alignment_decisions: dict[str, dict[str, object]] = {}
         for logical, dataset_path in manifest.channel_map.items():
             data = normalize_signal(read_dataset(h5file, dataset_path))
             fs = manifest.fs_map.get(logical)
             if fs is None:
                 continue
-            segments, warn = align_signal(data, fs, n_epochs, config.epoch_sec)
-            warnings.extend(warn)
+            aligned = align_signal_deterministic(
+                data,
+                fs,
+                n_epochs,
+                config.epoch_sec,
+                mode=alignment_mode,
+            )
+            if aligned.decision.status != "exact":
+                warnings.append("signal_length_reconciled")
+            alignment_decisions[logical] = {
+                "status": aligned.decision.status,
+                "reason": aligned.decision.reason,
+                "expected_samples": aligned.decision.expected_samples,
+                "available_samples": aligned.decision.available_samples,
+            }
             signals[logical] = SignalSeries(
                 name=logical,
                 data=data,
                 fs=fs,
-                segments=segments,
+                segments=aligned.segments,
             )
+
+    required_channels = set(contracts.qc_policy.get("required_channels", []))
+    missing_required = sorted([name for name in required_channels if name not in signals])
+    if missing_required:
+        raise ExtractionError(
+            code="E_QC_FAIL",
+            message="Missing required channels",
+            details={"missing_required_channels": missing_required},
+        )
+
+    channel_qc, qc_summary = run_qc(signals, manifest.fs_map, contracts.qc_policy)
+    optional_failed = set(qc_summary.get("optional_failed_channels", []))
+    if optional_failed:
+        signals = {name: value for name, value in signals.items() if name not in optional_failed}
 
     ctx = FeatureContext(config=config, n_epochs=n_epochs, signals=signals, hypnogram=hypnogram)
 
@@ -89,6 +123,7 @@ def extract_record(path: str | Path, config: ExtractConfig) -> ExtractResult:
 
     metadata = {
         "record_id": manifest.record_id,
+        "source_path": str(path),
         "start_time": manifest.start_time,
         "channel_map": manifest.channel_map,
         "fs_map": manifest.fs_map,
@@ -96,7 +131,11 @@ def extract_record(path: str | Path, config: ExtractConfig) -> ExtractResult:
         "feature_spec_version": config.feature_spec_version,
         "extractor_version": "0.1.0",
         "config_hash": config.to_hash(),
+        "config_payload": config_as_dict(config),
         "feature_order": FEATURE_ORDER,
+        "alignment_decisions": alignment_decisions,
+        "qc_summary": qc_summary,
+        "channel_qc": {name: asdict(report) for name, report in channel_qc.items()},
     }
     result = ExtractResult(
         record_id=manifest.record_id,

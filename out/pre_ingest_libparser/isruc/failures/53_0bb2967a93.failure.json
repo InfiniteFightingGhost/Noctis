@@ -1,0 +1,9 @@
+{
+  "dataset": "isruc",
+  "source_path": "/home/andy/Datasets/isruc/raw/subgroupI/53/53.rec",
+  "error_code": "E_CONTRACT_VIOLATION",
+  "message": "name 'ExtractionError' is not defined",
+  "details": {
+    "exception_type": "NameError"
+  }
+}

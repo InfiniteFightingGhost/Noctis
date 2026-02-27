@@ -1,7 +1,13 @@
 .env
 .opencode/
 AGENTS.md
+**/AGENTS.md
 agents/
+**/agents/
+**/*agent*.md
+.github/copilot-instructions.md
+.cursorrules
+.cursor/rules/
 docs/
 tools/
 .pytest_cache/
@@ -9,3 +15,9 @@ tools/
 .venv/
 __pycache__/
 *.pyc
+
+# Frontend generated artifacts
+apps/web-app/node_modules/
+apps/web-app/.angular/
+apps/web-app/dist/
+apps/web-app/test-results/
