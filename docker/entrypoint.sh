@@ -59,9 +59,6 @@ else:
     except Exception as e:
         print(f"[entrypoint] Error checking/creating database: {e}", file=sys.stderr, flush=True)
         raise SystemExit("Failed to check/create database")
-except Exception as e:
-    print(f"[entrypoint] Error checking/creating database: {e}", file=sys.stderr, flush=True)
-    raise SystemExit("Failed to check/create database")
 
 lock_id = 9423501
 
