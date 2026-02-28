@@ -21,7 +21,7 @@ if url.startswith("postgresql+psycopg://"):
 
 # Extract the database name from the URL (last part after the last /)
 url_parts = url.rsplit("/", 1)
-db_name = url_parts[1] if len(url_parts) > 1 else "noctis"
+db_name = url_parts[1].strip() if len(url_parts) > 1 else "noctis"
 postgres_url = url_parts[0] + "/postgres"  # Connect to default postgres DB to create if needed
 
 for attempt in range(60):
