@@ -9,7 +9,7 @@ import sys
 
 import psycopg
 
-url = os.getenv("DATABASE_URL")
+url = os.getenv("DATABASE_URL", "").strip()
 if not url:
     print("ERROR: DATABASE_URL not set", file=sys.stderr)
     raise SystemExit("DATABASE_URL not set")
