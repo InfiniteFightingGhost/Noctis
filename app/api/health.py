@@ -13,9 +13,21 @@ from app.utils.errors import ModelUnavailableError
 router = APIRouter(tags=["health"])
 
 
+import logging
+import time
+
+logger = logging.getLogger(__name__)
+
+
 @router.get("/healthz")
 def healthz() -> dict:
-    return {"status": "ok"}
+    start_time = time.time()
+    try:
+        logger.info("Health check called")
+        # Quick test to ensure the app is responsive
+        return {"status": "ok", "response_time": time.time() - start_time}
+    except Exception:
+        return {"status": "error", "response_time": time.time() - start_time}
 
 
 @router.get("/readyz")

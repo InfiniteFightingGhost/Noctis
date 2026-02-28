@@ -37,7 +37,7 @@ dockerfilePath = "docker/Dockerfile"
 
 [deploy]
 startCommand = "/app/entrypoint.sh gunicorn -c docker/gunicorn.conf.py app.main:app"
-healthcheckPath = "/healthz"
+healthcheckPath = "/readyz"
 healthcheckTimeout = 10
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
