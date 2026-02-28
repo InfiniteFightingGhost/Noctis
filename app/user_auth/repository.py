@@ -16,9 +16,10 @@ def get_auth_user_by_id(session: Session, user_id: uuid.UUID) -> AuthUser | None
     return session.get(AuthUser, user_id)
 
 
-def create_auth_user(session: Session, email: str, password_hash: str) -> AuthUser:
+def create_auth_user(session: Session, username: str, email: str, password_hash: str) -> AuthUser:
     now = datetime.now(timezone.utc)
     user = AuthUser(
+        username=username,
         email=email,
         password_hash=password_hash,
         created_at=now,

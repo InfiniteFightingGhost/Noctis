@@ -188,6 +188,8 @@ def _load_snapshot(session: Session, snapshot_id: uuid.UUID) -> DatasetBuildResu
     splits = _recording_split_indices(
         np.asarray(recording_list),
         np.asarray(window_end_ts),
+        y=np.asarray(y),
+        dataset_ids=np.full(len(y), "UNKNOWN", dtype=object),
         train_ratio=split_config.train,
         val_ratio=split_config.val,
         test_ratio=split_config.test,
@@ -196,6 +198,12 @@ def _load_snapshot(session: Session, snapshot_id: uuid.UUID) -> DatasetBuildResu
         split_time_aware=_split_time_aware(snapshot.recording_filter),
         split_purge_gap=_split_purge_gap(snapshot.recording_filter),
         split_block_seconds=_split_block_seconds(snapshot.recording_filter),
+        split_grouped_stratification=bool(
+            (snapshot.recording_filter or {}).get("split_grouped_stratification") or False
+        ),
+        split_stratify_key=str(
+            (snapshot.recording_filter or {}).get("split_stratify_key") or "dataset_rem_bucket"
+        ),
     )
     _validate_split_integrity(
         np.asarray(recording_list),
@@ -227,6 +235,12 @@ def _load_snapshot(session: Session, snapshot_id: uuid.UUID) -> DatasetBuildResu
             "grouping_key": "recording_id",
             "time_aware": _split_time_aware(snapshot.recording_filter),
             "purge_gap": _split_purge_gap(snapshot.recording_filter),
+            "grouped_stratification": bool(
+                (snapshot.recording_filter or {}).get("split_grouped_stratification") or False
+            ),
+            "stratify_key": str(
+                (snapshot.recording_filter or {}).get("split_stratify_key") or "dataset_rem_bucket"
+            ),
             "block_seconds": _split_block_seconds(snapshot.recording_filter),
         },
         "window_alignment": {

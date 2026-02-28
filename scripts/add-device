@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -lt 2 ]; then
+  echo "Usage: add-device \"<name>\" \"<external-id>\""
+  exit 1
+fi
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+NAME="$1"
+EXTERNAL_ID="$2"
+
+python "$ROOT_DIR/scripts/register_device.py" --name "$NAME" --external-id "$EXTERNAL_ID"

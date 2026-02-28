@@ -1,20 +1,31 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
+
+const PORT = 4173;
 
 export default defineConfig({
-  testDir: "./e2e",
-  timeout: 120_000,
+  testDir: "./tests/e2e",
+  timeout: 45_000,
   expect: {
     timeout: 10_000,
   },
+  fullyParallel: true,
+  retries: 0,
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://localhost:4200",
-    headless: true,
+    baseURL: `http://127.0.0.1:${PORT}`,
+    trace: "on-first-retry",
+    screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npm run start -- --host 0.0.0.0 --port 4200",
-    url: "http://localhost:4200",
+    command: `npm run dev -- --host 127.0.0.1 --port ${PORT}`,
+    url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: true,
-    cwd: ".",
     timeout: 120_000,
   },
+  projects: [
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
 });

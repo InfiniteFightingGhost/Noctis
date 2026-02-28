@@ -4,15 +4,9 @@ import os
 import uuid
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 
-
-def _migrate(database_url: str) -> None:
-    config = Config("alembic.ini")
-    config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(config, "head")
+from tests.integration.utils import migrate_database
 
 
 @pytest.mark.skipif(
@@ -23,11 +17,12 @@ def _migrate(database_url: str) -> None:
 async def test_user_auth_flow() -> None:
     database_url = os.environ["INTEGRATION_TEST_DATABASE_URL"]
     os.environ["DATABASE_URL"] = database_url
-    _migrate(database_url)
+    migrate_database(database_url)
 
     from app.main import create_app
 
     app = create_app()
+    username = f"user_{uuid.uuid4().hex[:8]}"
     email = f"user-{uuid.uuid4().hex}@example.com"
     password = "Str0ngPassw0rd!"
 
@@ -35,16 +30,17 @@ async def test_user_auth_flow() -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             register_response = await client.post(
                 "/v1/auth/register",
-                json={"email": email, "password": password},
+                json={"username": username, "email": email, "password": password},
             )
             assert register_response.status_code == 201
             register_payload = register_response.json()
+            assert register_payload["user"]["username"] == username
             assert register_payload["user"]["email"] == email
             assert register_payload["access_token"]
 
             duplicate_response = await client.post(
                 "/v1/auth/register",
-                json={"email": email, "password": password},
+                json={"username": username, "email": email, "password": password},
             )
             assert duplicate_response.status_code == 409
 
@@ -54,6 +50,7 @@ async def test_user_auth_flow() -> None:
             )
             assert login_response.status_code == 200
             login_payload = login_response.json()
+            assert login_payload["user"]["username"] == username
             assert login_payload["user"]["email"] == email
             token = login_payload["access_token"]
 
@@ -78,4 +75,5 @@ async def test_user_auth_flow() -> None:
                 headers={"Authorization": f"Bearer {token}"},
             )
             assert me_response.status_code == 200
+            assert me_response.json()["username"] == username
             assert me_response.json()["email"] == email

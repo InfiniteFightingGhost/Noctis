@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from app.ml.decoding import viterbi_decode_probabilities
+from app.ml.decoding import viterbi_decode_probabilities_with_penalties
 from app.ml.registry import LoadedModel
 from app.ml.validation import prepare_batch
 
@@ -50,7 +50,12 @@ def predict_windows(
     if not np.isfinite(probabilities).all():
         raise ValueError("Model probabilities contain NaN or Inf")
     output_labels = _resolve_output_labels(model.model.labels, probabilities.shape[1])
-    decoded = viterbi_decode_probabilities(probabilities, output_labels)
+    transition_penalties = model.model.transition_penalties(output_labels)
+    decoded = viterbi_decode_probabilities_with_penalties(
+        probabilities,
+        output_labels,
+        transition_penalties=transition_penalties,
+    )
     predictions: list[dict[str, object]] = []
     for idx, row in enumerate(probabilities):
         max_idx = int(decoded[idx])

@@ -55,4 +55,9 @@ with psycopg.connect(url) as conn:
         conn.execute("SELECT pg_advisory_unlock(%s)", (lock_id,))
 PY
 
+if [ -n "$PROMETHEUS_MULTIPROC_DIR" ]; then
+  mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
+  rm -f "$PROMETHEUS_MULTIPROC_DIR"/*
+fi
+
 exec "$@"

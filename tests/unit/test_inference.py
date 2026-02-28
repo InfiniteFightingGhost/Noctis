@@ -7,14 +7,15 @@ from app.services.inference import predict_windows
 
 class _FakeModel:
     def __init__(self) -> None:
-        self.labels = ["WAKE", "N1", "N2", "N3", "REM"]
+        self.labels = ["W", "Light", "Deep", "REM"]
         self.last_dataset_ids = None
 
     def predict_proba(self, batch: np.ndarray, *, dataset_ids=None) -> np.ndarray:
         self.last_dataset_ids = dataset_ids
-        return np.tile(
-            np.asarray([[0.9, 0.05, 0.03, 0.01, 0.01]], dtype=np.float32), (batch.shape[0], 1)
-        )
+        return np.tile(np.asarray([[0.9, 0.05, 0.03, 0.02]], dtype=np.float32), (batch.shape[0], 1))
+
+    def transition_penalties(self, labels: list[str]):
+        return None
 
 
 class _FakeLoaded:

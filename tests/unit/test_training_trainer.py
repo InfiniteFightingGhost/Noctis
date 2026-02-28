@@ -29,11 +29,35 @@ def test_prepare_sequence_features_allows_non_finite_for_imputation() -> None:
         }
     )
     dataset = {
-        "X": np.asarray([[[np.nan, 1.0], [2.0, 3.0]]], dtype=np.float32),
+        "X": np.asarray(
+            [
+                [
+                    [0.0, np.nan, 1.0, 0.0, 1.0, 0.5, 0.1, 2.0, 1.0, 0.0, 0.0, 3.0, 1.0, 0.4, 1.0],
+                    [0.0, 2.0, 1.0, 0.1, 1.2, 0.5, 0.0, 2.0, 1.0, 0.0, 0.0, 3.0, 1.0, 0.4, 1.0],
+                ]
+            ],
+            dtype=np.float32,
+        ),
         "y": np.asarray(["N2"]),
-        "label_map": np.asarray(["N2"]),
     }
-    X, y, label_map = _prepare_sequence_features(dataset, config)
+    feature_names = [
+        "in_bed_pct",
+        "hr_mean",
+        "hr_std",
+        "dhr",
+        "rr_mean",
+        "rr_std",
+        "drr",
+        "large_move_pct",
+        "minor_move_pct",
+        "turnovers_delta",
+        "apnea_delta",
+        "flags",
+        "vib_move_pct",
+        "vib_resp_q",
+        "agree_flags",
+    ]
+    X, y, label_map = _prepare_sequence_features(dataset, config, feature_names=feature_names)
     assert np.isnan(X).any()
-    assert y.tolist() == ["N2"]
-    assert label_map == ["N2"]
+    assert y.tolist() == ["Light"]
+    assert label_map == ["W", "Light", "Deep", "REM"]

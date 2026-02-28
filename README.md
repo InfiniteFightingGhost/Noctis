@@ -7,9 +7,9 @@ Production-grade FastAPI + TimescaleDB inference service for sleep-stage predict
 ```
 cp .env.example .env
 ```
-2) Start the stack:
+2) Start the stack (build + migrations + health wait):
 ```
-docker compose up --build
+./scripts/docker-up.sh
 ```
 3) Verify health:
 ```
@@ -72,6 +72,34 @@ Sentinels:
 
 Provisioning (example SQL):
 ```
+
+Producer shortcut (auto-mint JWT + create/upsert device by external id):
+```bash
+python scripts/register_device.py --name "Noctis Halo S1 Mount" --external-id "noctis-halo-s1-001"
+```
+
+By default the script bootstraps a local ingest service client/key from your configured DB (`DATABASE_URL`) and signs JWTs automatically.
+
+Optional overrides (if you want explicit credentials instead of bootstrap):
+```bash
+export NOCTIS_SERVICE_CLIENT_ID="<service-client-id>"
+export NOCTIS_TENANT_ID="<tenant-id>"
+export NOCTIS_SERVICE_KEY_ID="<kid>"
+export NOCTIS_SERVICE_KEY_SECRET="<shared-secret>"
+python scripts/register_device.py --name "Noctis Halo S1 Mount" --external-id "noctis-halo-s1-001"
+```
+
+Convenience wrapper (name + external id only):
+```bash
+./scripts/add-device "Noctis Halo S1 Mount" "noctis-halo-s1-001"
+```
+
+Optional shell alias:
+```bash
+alias add-device="$PWD/scripts/add-device"
+```
+
+The script auto-creates the Bearer token and calls `/v1/devices`. If the device already exists, it resolves and prints the existing row.
 INSERT INTO service_clients (id, tenant_id, name, role, status, created_at)
 VALUES ('<client-id>', '<tenant-id>', 'ingest-svc', 'ingest', 'active', NOW());
 

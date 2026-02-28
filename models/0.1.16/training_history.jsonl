@@ -1,0 +1,12 @@
+{"epoch": 1, "stage": "pretrain", "train_loss": 0.12240819107265066, "learning_rate": 5e-05}
+{"epoch": 2, "stage": "pretrain", "train_loss": 0.1010817784663388, "learning_rate": 5e-05}
+{"epoch": 3, "stage": "pretrain", "train_loss": 0.09913202225920154, "learning_rate": 5e-05}
+{"epoch": 4, "stage": "pretrain", "train_loss": 0.09771338170851462, "learning_rate": 5e-05}
+{"epoch": 1, "stage": "finetune", "train_loss": 1.4249028483752546, "val_loss": 1.3995514924709613, "val_macro_f1": 0.3279188415823987, "val_rem_recall": 0.0, "loss_mode": "weighted_ce", "learning_rate": 0.0001}
+{"epoch": 2, "stage": "finetune", "train_loss": 1.385769233935745, "val_loss": 1.3687875748990657, "val_macro_f1": 0.30668317337665224, "val_rem_recall": 0.0, "loss_mode": "focal", "learning_rate": 0.0001}
+{"epoch": 3, "stage": "finetune", "train_loss": 0.551448879720715, "val_loss": 0.5522213756710619, "val_macro_f1": 0.24077672256643917, "val_rem_recall": 0.31762794476035744, "loss_mode": "focal", "learning_rate": 0.0001}
+{"epoch": 4, "stage": "finetune", "train_loss": 0.5363013989833499, "val_loss": 0.5128327216748353, "val_macro_f1": 0.2693974256045496, "val_rem_recall": 0.5483346872461413, "loss_mode": "focal", "learning_rate": 5e-05}
+{"epoch": 5, "stage": "finetune", "train_loss": 0.5232836259741328, "val_loss": 0.5185567882362303, "val_macro_f1": 0.2535850023723462, "val_rem_recall": 0.4354183590576767, "loss_mode": "focal", "learning_rate": 5e-05}
+{"epoch": 6, "stage": "finetune", "train_loss": 0.5115500688552856, "val_loss": 0.5404769208405044, "val_macro_f1": 0.23617685023948148, "val_rem_recall": 0.26645004061738425, "loss_mode": "focal", "learning_rate": 5e-05}
+{"epoch": 7, "stage": "finetune", "train_loss": 0.5041362224437644, "val_loss": 0.5192366663243745, "val_macro_f1": 0.2560516355540313, "val_rem_recall": 0.3809910641754671, "loss_mode": "focal", "learning_rate": 2.5e-05}
+{"epoch": 8, "stage": "finetune", "train_loss": 0.503621108539206, "val_loss": 0.5090928487070314, "val_macro_f1": 0.2601176957154523, "val_rem_recall": 0.39642567018683994, "loss_mode": "focal", "learning_rate": 2.5e-05}

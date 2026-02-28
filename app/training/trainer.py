@@ -27,6 +27,7 @@ from app.ml.feature_schema import FeatureSchema, load_feature_schema
 from app.reproducibility.hashing import hash_artifact_dir, hash_json
 from app.reproducibility.snapshots import verify_snapshot_checksum
 from app.training.config import TrainingConfig, cnn_model_payload, cnn_training_payload
+from app.training.mmwave import FOUR_CLASS_LABELS, remap_stage_label, validate_base_feature_schema
 
 
 @dataclass(frozen=True)
@@ -73,11 +74,18 @@ def train_model(
     model_classes: list[str]
     metrics: dict[str, Any]
     estimator: Any | None = None
+    expected_input_dim_override: int | None = None
     if config.model_type == "cnn_bilstm":
         from app.training.cnn_bilstm import train_cnn_bilstm
 
-        X_seq, y, label_map = _prepare_sequence_features(dataset, config)
+        feature_names = [str(name) for name in feature_schema.features]
+        X_seq, y, label_map = _prepare_sequence_features(
+            dataset,
+            config,
+            feature_names=feature_names,
+        )
         dataset_ids = _dataset_ids(dataset, len(y))
+        recording_ids = _recording_ids(dataset, len(y))
         eval_split = _resolve_evaluation_split_name(config, test_idx, val_idx, label_strategy)
         train_eval_split = eval_split
         if train_eval_split is None:
@@ -88,7 +96,9 @@ def train_model(
             X=X_seq,
             y=y,
             label_map=label_map,
+            feature_names=feature_names,
             dataset_ids=dataset_ids,
+            recording_ids=recording_ids,
             splits=splits,
             evaluation_split_name=train_eval_split,
         )
@@ -99,6 +109,7 @@ def train_model(
                 "evaluation_disabled": True,
             }
         model_classes = output.model_classes
+        expected_input_dim_override = int(output.metrics.get("input_dim", X_seq.shape[2]))
     elif config.model_type == "gradient_boosting":
         X, y, label_map = _prepare_features(dataset, config, feature_schema)
         scaler = StandardScaler()
@@ -183,7 +194,11 @@ def train_model(
         artifact_hash=artifact_hash,
         git_commit_hash=git_commit_hash,
         label_map_order_hash=label_map_order_hash,
+        expected_input_dim_override=expected_input_dim_override,
+        base_input_dim=feature_schema.size,
     )
+    if config.model_type == "cnn_bilstm":
+        metadata["feature_pipeline"] = metrics.get("feature_pipeline", {})
     (artifact_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
     return TrainingResult(
         version=version,
@@ -300,6 +315,8 @@ def _prepare_features(
 def _prepare_sequence_features(
     dataset: dict[str, Any],
     config: TrainingConfig,
+    *,
+    feature_names: list[str],
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     X = dataset["X"]
     y = dataset["y"]
@@ -307,11 +324,16 @@ def _prepare_sequence_features(
         raise ValueError("Expected 3D window tensor for sequence strategy")
     if config.feature_strategy != "sequence":
         raise ValueError("cnn_bilstm requires sequence feature strategy")
-    label_map = [str(label) for label in dataset.get("label_map", np.unique(y))]
-    label_map = _validate_label_map(label_map, y, enforce_order=config.enforce_label_map_order)
+    validate_base_feature_schema(feature_names)
+    remapped: list[str] = []
+    for label in y:
+        mapped = remap_stage_label(label)
+        if mapped is None:
+            raise ValueError(f"Unsupported stage label for unified 4-class pipeline: {label}")
+        remapped.append(mapped)
     X = X.astype(np.float32)
-    y = y.astype(str)
-    return X, y, label_map
+    y = np.asarray(remapped, dtype=str)
+    return X, y, list(FOUR_CLASS_LABELS)
 
 
 def _dataset_ids(dataset: dict[str, Any], row_count: int) -> np.ndarray:
@@ -322,6 +344,16 @@ def _dataset_ids(dataset: dict[str, Any], row_count: int) -> np.ndarray:
     if dataset_ids.shape[0] != row_count:
         raise ValueError("dataset_ids length does not match X")
     return dataset_ids
+
+
+def _recording_ids(dataset: dict[str, Any], row_count: int) -> np.ndarray:
+    values = dataset.get("recording_ids")
+    if values is None:
+        return np.asarray([f"recording_{idx}" for idx in range(row_count)], dtype=object)
+    recording_ids = np.asarray(values).astype(str)
+    if recording_ids.shape[0] != row_count:
+        raise ValueError("recording_ids length does not match X")
+    return recording_ids
 
 
 def _extract_splits(dataset: dict[str, Any]) -> dict[str, np.ndarray | None]:
@@ -515,14 +547,18 @@ def _build_metadata(
     artifact_hash: str,
     git_commit_hash: str | None,
     label_map_order_hash: str,
+    expected_input_dim_override: int | None,
+    base_input_dim: int,
 ) -> dict[str, Any]:
     dataset_metadata = dataset_metadata or {}
     window_size = int(dataset_metadata.get("window_size") or 0)
     epoch_seconds = int(dataset_metadata.get("epoch_seconds") or 0)
     if window_size <= 0:
         raise ValueError("Dataset window_size missing from metadata")
-    expected_input_dim = _expected_input_dim(
-        feature_schema.size, config.feature_strategy, window_size
+    expected_input_dim = (
+        expected_input_dim_override
+        if expected_input_dim_override is not None
+        else _expected_input_dim(feature_schema.size, config.feature_strategy, window_size)
     )
     return {
         "version": version,
@@ -545,8 +581,11 @@ def _build_metadata(
         "epoch_seconds": epoch_seconds,
         "window_stride": int(dataset_metadata.get("window_stride") or 1),
         "expected_input_dim": expected_input_dim,
-        "dataset_id_map": {"DODH": 0, "CAP": 1, "ISRUC": 2, "UNKNOWN": 3},
+        "base_input_dim": int(base_input_dim),
+        "dataset_id_map": {"DODH": 0, "CAP": 1, "ISRUC": 2, "SLEEP-EDF": 3, "UNKNOWN": 4},
         "inference_dataset_id": "UNKNOWN",
+        "split_grouped_stratification": config.split_grouped_stratification,
+        "split_stratify_key": config.split_stratify_key,
         "lineage": build_lineage_metadata(
             dataset_snapshot_id=snapshot_id,
             feature_schema_version=feature_schema.version,
@@ -596,6 +635,8 @@ def _config_payload(config: TrainingConfig) -> dict[str, Any]:
         "split_seed": config.split_seed,
         "split_grouping_key": config.split_grouping_key,
         "split_time_aware": config.split_time_aware,
+        "split_grouped_stratification": config.split_grouped_stratification,
+        "split_stratify_key": config.split_stratify_key,
         "evaluation_split_policy": config.evaluation_split_policy,
         "enforce_label_map_order": config.enforce_label_map_order,
         "hyperparameters": config.hyperparameters,
@@ -610,6 +651,15 @@ def _config_payload(config: TrainingConfig) -> dict[str, Any]:
         "metrics_thresholds": config.metrics_thresholds,
         "model": cnn_model_payload(config),
         "training": cnn_training_payload(config),
+        "evaluation": {
+            "calibration_bins": config.evaluation.calibration_bins,
+            "epoch_seconds": config.evaluation.epoch_seconds,
+            "forbidden_transitions": [
+                [int(src), int(dst)] for src, dst in config.evaluation.forbidden_transitions
+            ],
+            "hard_thresholds": config.evaluation.hard_thresholds,
+            "soft_thresholds": config.evaluation.soft_thresholds,
+        },
     }
 
 
@@ -624,9 +674,16 @@ def _validate_split_policy(dataset_metadata: dict[str, Any] | None, config: Trai
         "seed": config.split_seed,
         "grouping_key": config.split_grouping_key,
         "time_aware": config.split_time_aware,
+        "grouped_stratification": config.split_grouped_stratification,
+        "stratify_key": config.split_stratify_key,
+    }
+    defaults = {
+        "grouped_stratification": False,
+        "stratify_key": "dataset_rem_bucket",
     }
     for key, value in expected.items():
-        if policy.get(key) != value:
+        observed = policy.get(key, defaults.get(key))
+        if observed != value:
             raise ValueError("Dataset split policy mismatch")
 
 

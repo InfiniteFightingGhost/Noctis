@@ -53,10 +53,10 @@ This method starts the API service and the TimescaleDB database.
     ```
 
 2.  **Build and Run Containers:**
-    Use `docker-compose` to build the images and start the services.
+    Use the project helper command to build the images, run migrations, and start all required services.
 
     ```bash
-    docker compose up --build
+    ./scripts/docker-up.sh
     ```
 
     The API will be available at `http://localhost:8000`.

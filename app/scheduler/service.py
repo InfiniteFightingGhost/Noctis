@@ -48,6 +48,26 @@ def fetch_pending_jobs(session: Session, limit: int) -> list[RetrainJob]:
     )
 
 
+def claim_pending_job_ids(session: Session, limit: int) -> list:
+    now = datetime.now(timezone.utc)
+    rows = list(
+        session.execute(
+            select(RetrainJob)
+            .where(RetrainJob.status == "pending")
+            .order_by(RetrainJob.created_at)
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        .scalars()
+        .all()
+    )
+    for job in rows:
+        job.status = "running"
+        job.started_at = now
+        session.add(job)
+    return [job.id for job in rows]
+
+
 def mark_job_running(session: Session, job: RetrainJob) -> None:
     job.status = "running"
     job.started_at = datetime.now(timezone.utc)

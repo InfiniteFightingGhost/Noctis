@@ -136,6 +136,12 @@ AUTH_FAILURE_COUNT = Counter(
     ["reason"],
 )
 
+RATE_LIMITED_COUNT = Counter(
+    "rate_limited_requests_total",
+    "Requests rejected by rate limiting",
+    ["path"],
+)
+
 ACTIVE_TENANT_COUNT = Gauge(
     "active_tenant_count",
     "Number of active tenants",

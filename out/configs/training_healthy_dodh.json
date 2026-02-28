@@ -1,0 +1,27 @@
+{
+  "dataset_dir": "out/snapshots/ablation_dodh_80_20",
+  "output_root": "models",
+  "feature_schema_path": "models/active/feature_schema.json",
+  "dataset_snapshot_id": null,
+  "model_type": "gradient_boosting",
+  "random_seed": 42,
+  "class_balance": "none",
+  "feature_strategy": "mean",
+  "allow_predicted_labels": false,
+  "split_strategy": "recording",
+  "split_seed": 42,
+  "split_grouping_key": "recording_id",
+  "split_time_aware": false,
+  "evaluation_split_policy": "val_or_test",
+  "enforce_label_map_order": false,
+  "hyperparameters": {},
+  "search": {
+    "method": "random",
+    "param_grid": {},
+    "n_iter": 5,
+    "cv_folds": 3
+  },
+  "version_bump": "patch",
+  "experiment_name": "healthy_participants_dodh_only",
+  "metrics_thresholds": {}
+}

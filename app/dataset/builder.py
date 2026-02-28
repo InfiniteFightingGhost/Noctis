@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
@@ -20,6 +21,7 @@ from app.ml.feature_decode import decode_features
 from app.ml.feature_schema import load_feature_schema
 from app.ml.validation import ensure_finite
 from app.services.windowing import WindowedEpoch, build_windows
+from app.training.mmwave import FOUR_CLASS_LABELS, remap_stage_label
 
 
 @dataclass(frozen=True)
@@ -85,6 +87,8 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
         splits = _recording_split_indices(
             recording_ids,
             window_end_ts,
+            y=y,
+            dataset_ids=dataset_ids,
             train_ratio=config.split.train,
             val_ratio=config.split.val,
             test_ratio=config.split.test,
@@ -93,6 +97,8 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
             split_time_aware=config.split_time_aware,
             split_purge_gap=split_purge_gap,
             split_block_seconds=config.split_block_seconds,
+            split_grouped_stratification=config.split_grouped_stratification,
+            split_stratify_key=config.split_stratify_key,
         )
         _validate_split_integrity(
             recording_ids,
@@ -100,7 +106,7 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
             enforce_recording_unique=config.split_strategy == "recording",
             allow_unassigned=split_purge_gap > 0,
         )
-        label_map = sorted({label for label in y})
+        label_map = list(FOUR_CLASS_LABELS)
         metadata = _build_metadata(
             config,
             feature_schema,
@@ -110,6 +116,8 @@ def build_dataset(config: DatasetBuildConfig) -> DatasetBuildResult:
             label_source_counts=label_source_counts,
             padded_window_count=padded_window_count,
             split_purge_gap=split_purge_gap,
+            split_grouped_stratification=config.split_grouped_stratification,
+            split_stratify_key=config.split_stratify_key,
         )
         result = DatasetBuildResult(
             X=X,
@@ -282,7 +290,10 @@ def _align_labels(
         if label is None or source is None:
             continue
         X.append(tensor)
-        y.append(label)
+        remapped = remap_stage_label(label)
+        if remapped is None:
+            continue
+        y.append(remapped)
         label_sources.append(source)
         window_end_ts.append(window_ts.isoformat())
         recording_key = str(recording_id)
@@ -329,6 +340,8 @@ def _infer_dataset_id(external_id: str | None) -> str:
         return "CAP"
     if "isruc" in value:
         return "ISRUC"
+    if "sleep-edf" in value or "sleepedf" in value:
+        return "SLEEP-EDF"
     return "UNKNOWN"
 
 
@@ -493,6 +506,8 @@ def _stratified_split_indices(
 def _recording_split_indices(
     recording_ids: np.ndarray,
     window_end_ts: np.ndarray,
+    y: np.ndarray,
+    dataset_ids: np.ndarray,
     *,
     train_ratio: float,
     val_ratio: float,
@@ -502,6 +517,8 @@ def _recording_split_indices(
     split_time_aware: bool,
     split_purge_gap: int,
     split_block_seconds: int | None,
+    split_grouped_stratification: bool,
+    split_stratify_key: str,
 ) -> dict[str, np.ndarray]:
     if recording_ids.size == 0:
         return {
@@ -518,6 +535,14 @@ def _recording_split_indices(
         seed=seed,
     )
     total = len(groups)
+    if split_grouped_stratification:
+        groups = _stratify_groups(
+            groups,
+            y=y,
+            dataset_ids=dataset_ids,
+            seed=seed,
+            key=split_stratify_key,
+        )
     test_count = int(round(total * test_ratio))
     val_count = int(round(total * val_ratio))
     if test_count + val_count > total:
@@ -767,6 +792,8 @@ def _build_metadata(
     label_source_counts: dict[str, int],
     padded_window_count: int,
     split_purge_gap: int,
+    split_grouped_stratification: bool,
+    split_stratify_key: str,
 ) -> dict[str, Any]:
     return {
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -807,6 +834,8 @@ def _build_metadata(
             "time_aware": config.split_time_aware or config.split_strategy == "recording_time",
             "purge_gap": split_purge_gap,
             "block_seconds": config.split_block_seconds,
+            "grouped_stratification": split_grouped_stratification,
+            "stratify_key": split_stratify_key,
         },
         "window_alignment": {
             "end_ts": "epoch_start_plus_duration",
@@ -816,6 +845,46 @@ def _build_metadata(
         },
         "window_stride": 1,
     }
+
+
+def _stratify_groups(
+    groups: list[dict[str, Any]],
+    *,
+    y: np.ndarray,
+    dataset_ids: np.ndarray,
+    seed: int,
+    key: str,
+) -> list[dict[str, Any]]:
+    strata: dict[str, list[dict[str, Any]]] = {}
+    for group in groups:
+        indices = np.asarray(group.get("indices", []), dtype=int)
+        if indices.size == 0:
+            continue
+        if key == "dataset":
+            values = sorted({str(v) for v in dataset_ids[indices]})
+            strat_key = values[0] if values else "UNKNOWN"
+        else:
+            datasets = sorted({str(v) for v in dataset_ids[indices]})
+            dataset_key = datasets[0] if datasets else "UNKNOWN"
+            rem_ratio = float(np.mean(y[indices] == "REM"))
+            rem_bucket = "low" if rem_ratio < 0.15 else ("mid" if rem_ratio < 0.30 else "high")
+            strat_key = f"{dataset_key}:{rem_bucket}"
+        strata.setdefault(strat_key, []).append(group)
+
+    rng = random.Random(seed)
+    for groups_in_stratum in strata.values():
+        rng.shuffle(groups_in_stratum)
+
+    ordered: list[dict[str, Any]] = []
+    pending = True
+    while pending:
+        pending = False
+        for strat_key in sorted(strata):
+            bucket = strata[strat_key]
+            if bucket:
+                ordered.append(bucket.pop(0))
+                pending = True
+    return ordered
 
 
 def _git_commit_hash() -> str | None:

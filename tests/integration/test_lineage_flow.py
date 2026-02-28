@@ -7,15 +7,9 @@ from pathlib import Path
 import uuid
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 
-
-def _migrate(database_url: str) -> None:
-    config = Config("alembic.ini")
-    config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(config, "head")
+from tests.integration.utils import migrate_database
 
 
 @pytest.mark.skipif(
@@ -37,7 +31,7 @@ async def test_snapshot_training_lineage_flow(tmp_path: Path) -> None:
 
     settings_module._get_settings_cached.cache_clear()
 
-    _migrate(database_url)
+    migrate_database(database_url)
 
     from app.main import create_app
     from app.db.models import Prediction

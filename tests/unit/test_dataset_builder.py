@@ -95,6 +95,8 @@ def test_recording_time_split_groups_overlaps() -> None:
     splits = _recording_split_indices(
         recording_ids,
         window_end_ts,
+        y=np.asarray(["W", "W", "REM", "REM", "Light", "Deep"]),
+        dataset_ids=np.asarray(["CAP", "CAP", "CAP", "CAP", "ISRUC", "ISRUC"]),
         train_ratio=0.5,
         val_ratio=0.25,
         test_ratio=0.25,
@@ -103,6 +105,8 @@ def test_recording_time_split_groups_overlaps() -> None:
         split_time_aware=True,
         split_purge_gap=0,
         split_block_seconds=None,
+        split_grouped_stratification=False,
+        split_stratify_key="dataset_rem_bucket",
     )
 
     def split_for(rec_id: str) -> str:
@@ -127,6 +131,8 @@ def test_split_purge_gap_drops_boundary_windows() -> None:
     splits = _recording_split_indices(
         recording_ids,
         window_end_ts,
+        y=np.asarray(["W", "Light", "Deep", "REM"]),
+        dataset_ids=np.asarray(["CAP", "CAP", "CAP", "CAP"]),
         train_ratio=0.5,
         val_ratio=0.0,
         test_ratio=0.5,
@@ -135,6 +141,8 @@ def test_split_purge_gap_drops_boundary_windows() -> None:
         split_time_aware=True,
         split_purge_gap=1,
         split_block_seconds=60,
+        split_grouped_stratification=False,
+        split_stratify_key="dataset_rem_bucket",
     )
     assigned = set(splits["train"]) | set(splits["test"]) | set(splits["val"])
     assert 2 not in assigned
@@ -147,6 +155,7 @@ def test_infer_dataset_id_from_external_id() -> None:
     assert _infer_dataset_id("subject_dodh_001") == "DODH"
     assert _infer_dataset_id("CAP-night-2") == "CAP"
     assert _infer_dataset_id("isruc_patient") == "ISRUC"
+    assert _infer_dataset_id("sleepedf-subject") == "SLEEP-EDF"
     assert _infer_dataset_id("other") == "UNKNOWN"
 
 

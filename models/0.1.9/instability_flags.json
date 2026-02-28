@@ -1,0 +1,8 @@
+{
+  "threshold": 0.15,
+  "macro_f1_spread": 0.0,
+  "DOMAIN_INSTABILITY": false,
+  "instability_detected": false,
+  "lowest_dataset": "UNKNOWN",
+  "lowest_dataset_macro_f1": 0.2222862850627753
+}

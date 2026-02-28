@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.dialects.postgresql import insert
 
 from app.auth.dependencies import require_scopes
@@ -44,6 +44,7 @@ router = APIRouter(tags=["predict"], dependencies=[Depends(require_scopes("read"
 def predict(
     payload: PredictRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     batch_mode: bool | None = Query(default=None, alias="batch"),
     tenant: TenantContext = Depends(get_tenant_context),
 ) -> PredictResponse:
@@ -216,37 +217,25 @@ def predict(
         )
         PREDICTION_CONFIDENCE_HISTOGRAM.observe(float(prediction_data["confidence"]))
 
-    def _insert_predictions(session):
-        inserted_count = 0
-        if prediction_rows:
-            stmt = insert(Prediction).values(prediction_rows)
-            stmt = stmt.on_conflict_do_nothing(
-                index_elements=[Prediction.recording_id, Prediction.window_end_ts]
+    persistence_args = {
+        "prediction_rows": prediction_rows,
+        "daily_feature_stats": daily_feature_stats,
+        "tenant_id": tenant.id,
+        "recording_id": payload.recording_id,
+        "model_version": loaded_model.version,
+        "feature_schema_version": loaded_model.feature_schema.version,
+        "inference_duration_seconds": inference_duration_seconds,
+    }
+    if settings.predict_async_persistence:
+        try:
+            background_tasks.add_task(
+                _persist_prediction_side_effects_with_retry,
+                **persistence_args,
             )
-            result = session.execute(stmt)
-            inserted_count = int(result.rowcount or 0)
-        if daily_feature_stats:
-            _upsert_feature_stats(
-                session,
-                daily_feature_stats,
-                tenant_id=tenant.id,
-                recording_id=payload.recording_id,
-                model_version=loaded_model.version,
-                feature_schema_version=loaded_model.feature_schema.version,
-            )
-        if inserted_count > 0:
-            session.add(
-                ModelUsageStat(
-                    tenant_id=tenant.id,
-                    model_version=loaded_model.version,
-                    window_start_ts=prediction_rows[0]["window_start_ts"],
-                    window_end_ts=prediction_rows[-1]["window_end_ts"],
-                    prediction_count=inserted_count,
-                    average_latency_ms=(inference_duration_seconds * 1000.0 / inserted_count),
-                )
-            )
-
-    run_with_db_retry(_insert_predictions, commit=True, operation_name="predict_insert")
+        except Exception:
+            _persist_prediction_side_effects_with_retry(**persistence_args)
+    else:
+        _persist_prediction_side_effects_with_retry(**persistence_args)
 
     return PredictResponse(
         recording_id=payload.recording_id,
@@ -300,3 +289,80 @@ def _upsert_feature_stats(
                     stats=aggregate.stats,
                 )
             )
+
+
+def _persist_prediction_side_effects_with_retry(
+    *,
+    prediction_rows: list[dict[str, Any]],
+    daily_feature_stats,
+    tenant_id,
+    recording_id,
+    model_version: str,
+    feature_schema_version: str,
+    inference_duration_seconds: float,
+) -> None:
+    def _op(session):
+        _persist_prediction_side_effects(
+            session,
+            prediction_rows=prediction_rows,
+            daily_feature_stats=daily_feature_stats,
+            tenant_id=tenant_id,
+            recording_id=recording_id,
+            model_version=model_version,
+            feature_schema_version=feature_schema_version,
+            inference_duration_seconds=inference_duration_seconds,
+        )
+
+    try:
+        run_with_db_retry(_op, commit=True, operation_name="predict_insert")
+    except Exception:
+        logging.getLogger("app").exception(
+            "predict_persistence_failed",
+            extra={
+                "recording_id": str(recording_id),
+                "tenant_id": str(tenant_id),
+                "model_version": model_version,
+                "prediction_rows": len(prediction_rows),
+            },
+        )
+
+
+def _persist_prediction_side_effects(
+    session,
+    *,
+    prediction_rows: list[dict[str, Any]],
+    daily_feature_stats,
+    tenant_id,
+    recording_id,
+    model_version: str,
+    feature_schema_version: str,
+    inference_duration_seconds: float,
+) -> None:
+    inserted_count = 0
+    if prediction_rows:
+        stmt = insert(Prediction).values(prediction_rows)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=[Prediction.recording_id, Prediction.window_end_ts]
+        )
+        result = session.execute(stmt)
+        inserted_count = int(result.rowcount or 0)
+    if daily_feature_stats:
+        _upsert_feature_stats(
+            session,
+            daily_feature_stats,
+            tenant_id=tenant_id,
+            recording_id=recording_id,
+            model_version=model_version,
+            feature_schema_version=feature_schema_version,
+        )
+    if inserted_count > 0:
+        session.add(
+            ModelUsageStat(
+                tenant_id=tenant_id,
+                model_version=model_version,
+                window_start_ts=prediction_rows[0]["window_start_ts"],
+                window_end_ts=prediction_rows[-1]["window_end_ts"],
+                prediction_count=inserted_count,
+                average_latency_ms=(inference_duration_seconds * 1000.0 / inserted_count),
+            )
+        )

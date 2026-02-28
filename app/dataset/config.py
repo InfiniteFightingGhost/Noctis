@@ -11,8 +11,8 @@ import yaml
 
 @dataclass(frozen=True)
 class DatasetSplitConfig:
-    train: float = 0.7
-    val: float = 0.15
+    train: float = 0.75
+    val: float = 0.1
     test: float = 0.15
 
     def validate(self) -> None:
@@ -56,6 +56,8 @@ class DatasetBuildConfig:
     split_time_aware: bool = False
     split_purge_gap: int = 0
     split_block_seconds: int | None = None
+    split_grouped_stratification: bool = False
+    split_stratify_key: str = "dataset_rem_bucket"
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -77,8 +79,8 @@ def dataset_config_from_payload(payload: dict[str, Any]) -> DatasetBuildConfig:
     if not feature_schema_path and not feature_schema_version:
         raise ValueError("feature_schema_path or feature_schema_version required")
     split = DatasetSplitConfig(
-        train=float(split_payload.get("train", 0.7)),
-        val=float(split_payload.get("val", 0.15)),
+        train=float(split_payload.get("train", 0.75)),
+        val=float(split_payload.get("val", 0.1)),
         test=float(split_payload.get("test", 0.15)),
     )
     split.validate()
@@ -125,6 +127,8 @@ def dataset_config_from_payload(payload: dict[str, Any]) -> DatasetBuildConfig:
             if payload.get("split_block_seconds") is not None
             else None
         ),
+        split_grouped_stratification=bool(payload.get("split_grouped_stratification", False)),
+        split_stratify_key=str(payload.get("split_stratify_key", "dataset_rem_bucket")),
     )
     return config
 

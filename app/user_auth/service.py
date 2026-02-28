@@ -26,6 +26,7 @@ from app.user_auth.security import (
 
 
 def register(payload: RegisterRequest) -> AuthResponse:
+    username = _normalize_username(payload.username)
     email = _normalize_email(payload.email)
 
     existing = run_with_db_retry(
@@ -38,7 +39,7 @@ def register(payload: RegisterRequest) -> AuthResponse:
     password_hash = hash_password(payload.password)
     try:
         user = run_with_db_retry(
-            lambda session: repository.create_auth_user(session, email, password_hash),
+            lambda session: repository.create_auth_user(session, username, email, password_hash),
             commit=True,
             operation_name="auth_user_register",
         )
@@ -83,3 +84,7 @@ def _build_auth_response(user: AuthUser) -> AuthResponse:
 
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def _normalize_username(username: str) -> str:
+    return username.strip()

@@ -13,9 +13,8 @@ from app.experiments.service import (
 )
 from app.audit.scheduler import run_audit_cycle
 from app.scheduler.service import (
-    fetch_pending_jobs,
+    claim_pending_job_ids,
     mark_job_completed,
-    mark_job_running,
 )
 from app.training.config import training_config_from_payload
 from app.training.trainer import train_model
@@ -39,23 +38,25 @@ def run_scheduler_loop() -> None:
 def process_pending_jobs() -> None:
     settings = get_settings()
 
-    def _fetch(session):
-        return fetch_pending_jobs(session, settings.retrain_batch_size)
+    def _claim(session):
+        return claim_pending_job_ids(session, settings.retrain_batch_size)
 
-    jobs = run_with_db_retry(_fetch, operation_name="fetch_retrain_jobs")
-    for job in jobs:
-        _process_job(job.id)
+    job_ids = run_with_db_retry(
+        _claim,
+        commit=True,
+        operation_name="claim_retrain_jobs",
+    )
+    for job_id in job_ids:
+        _process_job(job_id)
 
 
 def _process_job(job_id) -> None:
-    def _mark_running(session):
-        job = _get_job(session, job_id)
-        mark_job_running(session, job)
-        return job
-
     job = run_with_db_retry(
-        _mark_running, commit=True, operation_name="mark_retrain_running"
+        lambda session: _get_job(session, job_id),
+        operation_name="get_retrain_job",
     )
+    if job.status != "running":
+        return
     model_version = None
     error_message = None
     try:
@@ -119,9 +120,7 @@ def _process_job(job_id) -> None:
 
     def _mark_done(session):
         job = _get_job(session, job_id)
-        mark_job_completed(
-            session, job, model_version=model_version, error_message=error_message
-        )
+        mark_job_completed(session, job, model_version=model_version, error_message=error_message)
 
     run_with_db_retry(_mark_done, commit=True, operation_name="mark_retrain_complete")
 

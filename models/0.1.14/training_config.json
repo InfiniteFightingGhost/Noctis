@@ -1,0 +1,116 @@
+{
+  "dataset_dir": "out/snapshots/ablation_dodh_80_20",
+  "output_root": "models",
+  "feature_schema_path": "models/active/feature_schema.json",
+  "dataset_snapshot_id": null,
+  "model_type": "gradient_boosting",
+  "random_seed": 42,
+  "class_balance": "none",
+  "feature_strategy": "mean",
+  "allow_predicted_labels": false,
+  "split_strategy": "recording",
+  "split_seed": 42,
+  "split_grouping_key": "recording_id",
+  "split_time_aware": false,
+  "split_grouped_stratification": false,
+  "split_stratify_key": "dataset_rem_bucket",
+  "evaluation_split_policy": "val_or_test",
+  "enforce_label_map_order": false,
+  "hyperparameters": {},
+  "search": {
+    "method": "random",
+    "param_grid": {},
+    "n_iter": 5,
+    "cv_folds": 3
+  },
+  "version_bump": "patch",
+  "experiment_name": "healthy_participants_dodh_only",
+  "metrics_thresholds": {},
+  "model": {
+    "use_dataset_conditioning": false,
+    "conditioning_mode": "onehot",
+    "conditioning_embed_dim": 8,
+    "conv_channels": [
+      64,
+      128
+    ],
+    "conv_kernel_size": 3,
+    "conv_dropout": 0.1,
+    "lstm_hidden_size": 128,
+    "lstm_layers": 2,
+    "lstm_dropout": 0.1,
+    "head_hidden_dims": [
+      128
+    ],
+    "head_dropout": 0.2,
+    "use_residual_blocks": false,
+    "dilation_schedule": [
+      1,
+      2
+    ]
+  },
+  "training": {
+    "batch_size": 64,
+    "max_epochs": 60,
+    "early_stopping_patience": 8,
+    "early_stopping_min_delta": 0.0,
+    "loss_type": "weighted_ce",
+    "focal_gamma": 2.0,
+    "auxiliary_loss_lambda": 0.3,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
+    "optimizer_beta1": 0.9,
+    "optimizer_beta2": 0.999,
+    "scheduler_type": "plateau",
+    "scheduler_factor": 0.5,
+    "scheduler_patience": 3,
+    "scheduler_min_lr": 1e-06,
+    "gradient_clip_norm": 1.0,
+    "instability_macro_f1_threshold": 0.15,
+    "n2_class_weight_multiplier": 1.0,
+    "enable_domain_transfer_tests": false,
+    "enable_binary_pretraining": true,
+    "pretrain_epochs": 10,
+    "pretrain_lr_scale": 1.0,
+    "pretrain_freeze_primary_head": true,
+    "class_weight_strategy": "log_balanced",
+    "focal_fallback_enabled": true,
+    "focal_fallback_gamma": 2.0,
+    "focal_trigger_rem_recall": 0.65,
+    "focal_trigger_patience": 2,
+    "normalization_policy": "recording_zscore_then_global",
+    "hard_mining_enabled": true,
+    "hard_mining_fraction": 0.1,
+    "hard_mining_oversample_factor": 2.0
+  },
+  "evaluation": {
+    "calibration_bins": 15,
+    "epoch_seconds": 30,
+    "forbidden_transitions": [
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        2
+      ]
+    ],
+    "hard_thresholds": {
+      "macro_f1_min": 0.75,
+      "mcc_min": 0.7,
+      "worst_decile_macro_f1_min": 0.5,
+      "domain_variance_macro_f1_max": 0.15,
+      "rem_latency_mae_max": 20.0,
+      "min_class_recall_floor": 0.15,
+      "rem_recall_floor": 0.65,
+      "deep_recall_floor": 0.7,
+      "worst_night_macro_f1_floor": 0.6,
+      "impossible_transition_rate_max": 0.08,
+      "wake_deep_direct_rate_max": 0.05
+    },
+    "soft_thresholds": {
+      "worst_decile_macro_f1_warn": 0.45
+    }
+  }
+}

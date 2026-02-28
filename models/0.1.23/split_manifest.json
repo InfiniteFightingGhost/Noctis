@@ -1,0 +1,14 @@
+{
+  "split_sizes": {
+    "train": 196359,
+    "val": 0,
+    "test": 48346
+  },
+  "recording_counts": {
+    "train": 210,
+    "val": 0,
+    "test": 53
+  },
+  "recording_overlap": false,
+  "recording_ids_present": true
+}

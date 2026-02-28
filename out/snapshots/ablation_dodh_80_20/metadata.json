@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-02-24T13:07:22.551424+00:00",
+  "created_at": "2026-02-24T22:46:37.278057+00:00",
   "window_size": 21,
   "epoch_seconds": 30,
   "allow_padding": false,
@@ -25,7 +25,7 @@
     "agree_flags"
   ],
   "feature_schema_path": null,
-  "git_commit_hash": "4ac57936c1985f68da020b3142df3d7c37f2ab83",
+  "git_commit_hash": "121a3d70a38574a683a63875cd8dd3ee8474f433",
   "filters": {
     "from_ts": null,
     "to_ts": null,
@@ -50,11 +50,10 @@
     "test": 5768
   },
   "label_map": [
-    "N1",
-    "N2",
-    "N3",
-    "REM",
-    "W"
+    "W",
+    "Light",
+    "Deep",
+    "REM"
   ],
   "split_policy": {
     "split_strategy": "recording",
@@ -62,7 +61,9 @@
     "grouping_key": "recording_id",
     "time_aware": false,
     "purge_gap": 0,
-    "block_seconds": null
+    "block_seconds": null,
+    "grouped_stratification": false,
+    "stratify_key": "dataset_rem_bucket"
   },
   "window_alignment": {
     "end_ts": "epoch_start_plus_duration",
@@ -71,8 +72,8 @@
     "alignment": "epoch_end"
   },
   "window_stride": 1,
-  "dataset_snapshot_id": "0a5f219e-319e-4012-8aeb-e9ace6fbb925",
-  "dataset_snapshot_checksum": "afb17c2edf794496bdd1aefc60a824bbe3b60d2eddb354ba31c3d1b7c5275993",
+  "dataset_snapshot_id": "8ffa9955-2a06-40c5-ae41-19fce8b7a15e",
+  "dataset_snapshot_checksum": "3bb44f0b99f0fb62a8ecaa8cdf6892ea52ee5ca7a728f036463f7fd77e66f3f5",
   "dataset_snapshot_row_count": 30418,
   "recording_filter": {
     "from_ts": null,

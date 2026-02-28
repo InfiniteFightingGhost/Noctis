@@ -5,17 +5,10 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 
 from app.db.models import FeatureStatistic, Prediction
-
-
-def _migrate(database_url: str) -> None:
-    config = Config("alembic.ini")
-    config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(config, "head")
+from tests.integration.utils import migrate_database
 
 
 @pytest.mark.skipif(
@@ -27,7 +20,7 @@ async def test_load_and_drift_flow() -> None:
     database_url = os.environ["INTEGRATION_TEST_DATABASE_URL"]
     os.environ["DATABASE_URL"] = database_url
     os.environ["PERFORMANCE_SAMPLE_SIZE"] = "2"
-    _migrate(database_url)
+    migrate_database(database_url)
 
     from app.main import create_app
     from tests.utils.auth import build_auth_header, provision_service_client

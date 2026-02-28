@@ -15,9 +15,8 @@ tools/
 .venv/
 __pycache__/
 *.pyc
+*.tsbuildinfo
 
 # Frontend generated artifacts
 apps/web-app/node_modules/
-apps/web-app/.angular/
 apps/web-app/dist/
-apps/web-app/test-results/

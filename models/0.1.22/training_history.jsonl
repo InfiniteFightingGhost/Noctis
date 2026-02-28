@@ -1,0 +1,28 @@
+{"epoch": 1, "stage": "pretrain", "train_loss": 0.1334906107709634, "learning_rate": 0.001}
+{"epoch": 2, "stage": "pretrain", "train_loss": 0.12438295366812224, "learning_rate": 0.001}
+{"epoch": 3, "stage": "pretrain", "train_loss": 0.11902209391747738, "learning_rate": 0.001}
+{"epoch": 4, "stage": "pretrain", "train_loss": 0.11454048239562477, "learning_rate": 0.001}
+{"epoch": 5, "stage": "pretrain", "train_loss": 0.11087587103287483, "learning_rate": 0.001}
+{"epoch": 6, "stage": "pretrain", "train_loss": 0.1080514065881959, "learning_rate": 0.001}
+{"epoch": 7, "stage": "pretrain", "train_loss": 0.10464510384262121, "learning_rate": 0.001}
+{"epoch": 8, "stage": "pretrain", "train_loss": 0.1018908273757024, "learning_rate": 0.001}
+{"epoch": 9, "stage": "pretrain", "train_loss": 0.09969804359371517, "learning_rate": 0.001}
+{"epoch": 10, "stage": "pretrain", "train_loss": 0.09700328394806024, "learning_rate": 0.001}
+{"epoch": 11, "stage": "pretrain", "train_loss": 0.09480718420167192, "learning_rate": 0.001}
+{"epoch": 12, "stage": "pretrain", "train_loss": 0.09212420542541908, "learning_rate": 0.001}
+{"epoch": 13, "stage": "pretrain", "train_loss": 0.08959993071345024, "learning_rate": 0.001}
+{"epoch": 14, "stage": "pretrain", "train_loss": 0.08713468588263978, "learning_rate": 0.001}
+{"epoch": 1, "stage": "finetune", "train_loss": 0.5266196226920559, "val_loss": 0.9440552031315824, "val_macro_f1": 0.23218072776380275, "val_rem_recall": 0.4096560048280024, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 2, "stage": "finetune", "train_loss": 0.4849906622310482, "val_loss": 0.9272679289970448, "val_macro_f1": 0.24543371518377655, "val_rem_recall": 0.35099577549788774, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 3, "stage": "finetune", "train_loss": 0.4538230689360952, "val_loss": 1.0269408709315395, "val_macro_f1": 0.24962096782669288, "val_rem_recall": 0.42824381412190704, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 4, "stage": "finetune", "train_loss": 0.4308691686378201, "val_loss": 1.0414048481200422, "val_macro_f1": 0.25743477613893184, "val_rem_recall": 0.3915509957754979, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 5, "stage": "finetune", "train_loss": 0.41298876734149725, "val_loss": 1.136786101494359, "val_macro_f1": 0.27026952590830333, "val_rem_recall": 0.3676523838261919, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 6, "stage": "finetune", "train_loss": 0.396338843173118, "val_loss": 1.1981754661118857, "val_macro_f1": 0.2773995040314698, "val_rem_recall": 0.36306578153289076, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 7, "stage": "finetune", "train_loss": 0.3858782113041905, "val_loss": 1.25147246975432, "val_macro_f1": 0.28189167854760067, "val_rem_recall": 0.34809897404948703, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 8, "stage": "finetune", "train_loss": 0.3743080752716544, "val_loss": 1.2822198600128845, "val_macro_f1": 0.2807459557576868, "val_rem_recall": 0.3448400724200362, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 9, "stage": "finetune", "train_loss": 0.36545789876664214, "val_loss": 1.3462273855373341, "val_macro_f1": 0.2726888205058271, "val_rem_recall": 0.34568497284248645, "loss_mode": "focal", "learning_rate": 0.001}
+{"epoch": 10, "stage": "finetune", "train_loss": 0.35676730435309784, "val_loss": 1.3703217407067616, "val_macro_f1": 0.2777850948453473, "val_rem_recall": 0.35171997585998793, "loss_mode": "focal", "learning_rate": 0.0005}
+{"epoch": 11, "stage": "finetune", "train_loss": 0.3281601942244577, "val_loss": 1.4856358202736055, "val_macro_f1": 0.295077400473542, "val_rem_recall": 0.31333735666867835, "loss_mode": "focal", "learning_rate": 0.0005}
+{"epoch": 12, "stage": "finetune", "train_loss": 0.3201948738050973, "val_loss": 1.5938899686372785, "val_macro_f1": 0.29472059047476706, "val_rem_recall": 0.3145443572721786, "loss_mode": "focal", "learning_rate": 0.0005}
+{"epoch": 13, "stage": "finetune", "train_loss": 0.315761174009753, "val_loss": 1.519580170088423, "val_macro_f1": 0.30215606460455535, "val_rem_recall": 0.32009656004828, "loss_mode": "focal", "learning_rate": 0.0005}
+{"epoch": 14, "stage": "finetune", "train_loss": 0.30948271955416284, "val_loss": 1.534614581545746, "val_macro_f1": 0.30107074391003485, "val_rem_recall": 0.31333735666867835, "loss_mode": "focal", "learning_rate": 0.0005}

@@ -59,6 +59,13 @@ class Settings(BaseSettings):
 
     request_timeout_seconds: float = 30.0
 
+    rate_limit_enabled: bool = True
+    rate_limit_window_seconds: int = 60
+    rate_limit_auth_requests: int = 30
+    rate_limit_predict_requests: int = 120
+    rate_limit_ingest_requests: int = 240
+    rate_limit_default_requests: int = 600
+
     db_retry_max_attempts: int = 3
     db_retry_base_delay_seconds: float = 0.2
     db_retry_max_delay_seconds: float = 2.0
@@ -73,6 +80,7 @@ class Settings(BaseSettings):
     performance_sample_size: int = 250
     inference_batch_size: int = 64
     enable_batch_inference: bool = True
+    predict_async_persistence: bool = True
 
     epochs_retention_days: int = 90
     predictions_retention_days: int = 180

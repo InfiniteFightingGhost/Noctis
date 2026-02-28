@@ -197,6 +197,11 @@ def unlink_device_user(
 
 
 @router.post(
+    "/devices/claim/by-id",
+    response_model=DeviceResponse,
+    dependencies=[Depends(require_scopes("read"))],
+)
+@router.post(
     "/devices/claim-by-id",
     response_model=DeviceResponse,
     dependencies=[Depends(require_scopes("read"))],

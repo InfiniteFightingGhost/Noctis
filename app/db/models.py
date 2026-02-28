@@ -56,9 +56,13 @@ class User(Base):
 
 class AuthUser(Base):
     __tablename__ = "auth_users"
-    __table_args__ = (UniqueConstraint("email", name="uq_auth_users_email"),)
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_auth_users_email"),
+        UniqueConstraint("username", name="uq_auth_users_username"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username: Mapped[str] = mapped_column(String(64))
     email: Mapped[str] = mapped_column(String(320))
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
@@ -77,6 +81,7 @@ class Device(Base):
         UniqueConstraint("tenant_id", "external_id", name="uq_devices_tenant_external"),
         Index("ix_devices_tenant", "tenant_id"),
         Index("ix_devices_tenant_user", "tenant_id", "user_id"),
+        Index("ix_devices_tenant_created_at", "tenant_id", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -124,6 +129,7 @@ class Recording(Base):
     __table_args__ = (
         Index("ix_recordings_tenant_device", "tenant_id", "device_id"),
         Index("ix_recordings_tenant", "tenant_id"),
+        Index("ix_recordings_tenant_started_at", "tenant_id", "started_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -157,7 +163,6 @@ class Epoch(Base):
             "epoch_index",
         ),
         Index("ix_epochs_tenant_epoch_start_ts", "tenant_id", "epoch_start_ts"),
-        Index("ix_epochs_recording_time", "recording_id", "epoch_start_ts"),
         Index("ix_epochs_recording_index", "recording_id", "epoch_index"),
     )
 
@@ -227,9 +232,9 @@ class Prediction(Base):
             "model_version",
             "window_end_ts",
         ),
-        Index("ix_predictions_recording_time", "recording_id", "window_end_ts"),
         Index("ix_predictions_model_version", "model_version", "window_end_ts"),
         Index("ix_predictions_snapshot", "dataset_snapshot_id", "window_end_ts"),
+        Index("ix_predictions_tenant_window_end_ts", "tenant_id", "window_end_ts"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -613,6 +618,7 @@ class Alarm(Base):
     __table_args__ = (
         Index("ix_alarms_tenant", "tenant_id"),
         Index("ix_alarms_tenant_scheduled", "tenant_id", "scheduled_for"),
+        Index("ix_alarms_tenant_created_at", "tenant_id", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -640,6 +646,7 @@ class Routine(Base):
     __table_args__ = (
         Index("ix_routines_tenant", "tenant_id"),
         Index("ix_routines_tenant_status", "tenant_id", "status"),
+        Index("ix_routines_tenant_status_updated_at", "tenant_id", "status", "updated_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

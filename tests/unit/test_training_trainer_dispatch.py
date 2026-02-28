@@ -26,8 +26,25 @@ class _FakeFeature:
 @dataclass(frozen=True)
 class _FakeFeatureSchema:
     version: str = "v1"
-    size: int = 3
+    size: int = 15
     schema_hash: str = "schema-hash"
+    features: list[str] = (
+        "in_bed_pct",
+        "hr_mean",
+        "hr_std",
+        "dhr",
+        "rr_mean",
+        "rr_std",
+        "drr",
+        "large_move_pct",
+        "minor_move_pct",
+        "turnovers_delta",
+        "apnea_delta",
+        "flags",
+        "vib_move_pct",
+        "vib_resp_q",
+        "agree_flags",
+    )
 
 
 @dataclass(frozen=True)
@@ -39,11 +56,12 @@ class _FakeSchemaRecord:
 
 
 def _write_dataset(dataset_dir: Path, *, X: np.ndarray, y: np.ndarray) -> None:
+    label_map = sorted({str(label) for label in y})
     np.savez_compressed(
         dataset_dir / "dataset.npz",
         X=X,
         y=y,
-        label_map=np.asarray(["N1", "N2", "N3", "REM", "WAKE"]),
+        label_map=np.asarray(label_map),
         recording_ids=np.asarray([f"r{i}" for i in range(X.shape[0])]),
         dataset_ids=np.asarray(["DODH", "CAP", "ISRUC", "DODH", "CAP", "ISRUC"][: X.shape[0]]),
         split_train=np.asarray([0, 1, 2, 3, 4]),
@@ -95,7 +113,7 @@ def test_train_model_dispatches_gradient_boosting(
 ) -> None:
     dataset_dir = tmp_path / "dataset"
     dataset_dir.mkdir(parents=True)
-    X = np.random.default_rng(1).normal(size=(6, 4, 3)).astype(np.float32)
+    X = np.random.default_rng(1).normal(size=(6, 4, 15)).astype(np.float32)
     y = np.asarray(["N1", "N2", "N3", "REM", "WAKE", "N2"])
     _write_dataset(dataset_dir, X=X, y=y)
     _patch_dependencies(monkeypatch)
@@ -125,8 +143,8 @@ def test_train_model_dispatches_cnn_bilstm(monkeypatch: pytest.MonkeyPatch, tmp_
     pytest.importorskip("torch")
     dataset_dir = tmp_path / "dataset"
     dataset_dir.mkdir(parents=True)
-    X = np.random.default_rng(2).normal(size=(6, 4, 3)).astype(np.float32)
-    y = np.asarray(["N1", "N2", "N3", "REM", "WAKE", "N2"])
+    X = np.random.default_rng(2).normal(size=(6, 4, 15)).astype(np.float32)
+    y = np.asarray(["W", "N2", "N3", "REM", "WAKE", "N1"])
     _write_dataset(dataset_dir, X=X, y=y)
     _patch_dependencies(monkeypatch)
 
@@ -143,8 +161,13 @@ def test_train_model_dispatches_cnn_bilstm(monkeypatch: pytest.MonkeyPatch, tmp_
             "split_seed": 42,
             "split_grouping_key": "recording_id",
             "split_time_aware": False,
-            "training": {"max_epochs": 1, "batch_size": 4},
-            "model": {"conv_channels": [8, 16], "head_hidden_dims": [16]},
+            "training": {"max_epochs": 40, "early_stopping_patience": 6, "batch_size": 4},
+            "model": {
+                "conv_channels": [8, 16],
+                "head_hidden_dims": [64],
+                "lstm_hidden_size": 128,
+                "lstm_layers": 2,
+            },
         }
     )
 
