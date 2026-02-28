@@ -1,0 +1,14 @@
+{
+  "dataset": "cap",
+  "source_path": "/home/andy/Datasets/capslpdb-1.0.0/nfle33.edf",
+  "error_code": "E_CHANNEL_AMBIGUOUS",
+  "message": "Multiple EDF channels matched same alias",
+  "details": {
+    "logical": "ecg",
+    "alias": "ecg",
+    "matches": [
+      6,
+      7
+    ]
+  }
+}

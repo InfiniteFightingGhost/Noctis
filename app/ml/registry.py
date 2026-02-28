@@ -9,6 +9,7 @@ from typing import Any, Callable
 from app.ml.feature_schema import FeatureSchema, load_feature_schema
 from app.ml.model import BaseModelAdapter, load_model
 from app.core.metrics import MODEL_RELOAD_FAILURE, MODEL_RELOAD_SUCCESS
+from app.core.settings import get_settings
 from app.resilience.faults import is_fault_active
 from app.reproducibility.hashing import hash_artifact_dir
 from app.utils.errors import ModelUnavailableError
@@ -44,7 +45,7 @@ class ModelRegistry:
                 bundle = load_model(model_dir)
                 feature_schema = load_feature_schema(model_dir / "feature_schema.json")
                 expected_hash = bundle.metadata.get("artifact_hash")
-                if expected_hash:
+                if expected_hash and get_settings().verify_model_artifact_hash:
                     computed_hash = hash_artifact_dir(
                         model_dir,
                         exclude_files={"metadata.json"},
@@ -55,6 +56,22 @@ class ModelRegistry:
                 expected_input_dim = bundle.metadata.get("expected_input_dim")
                 if feature_strategy is None or expected_input_dim is None:
                     raise ValueError("Model feature strategy metadata missing")
+                if str(feature_strategy) == "sequence":
+                    base_input_dim = int(bundle.metadata.get("base_input_dim", expected_input_dim))
+                    if base_input_dim != int(feature_schema.size):
+                        raise ValueError("Sequence model base feature size mismatch")
+                    feature_pipeline = bundle.metadata.get("feature_pipeline") or {}
+                    final_schema = feature_pipeline.get("final_feature_schema")
+                    if isinstance(final_schema, list) and final_schema:
+                        engineered_dim = len(final_schema)
+                    else:
+                        engineered_features = feature_pipeline.get("engineered_features")
+                        if isinstance(engineered_features, list):
+                            engineered_dim = base_input_dim + len(engineered_features)
+                        else:
+                            engineered_dim = base_input_dim
+                    if int(expected_input_dim) != int(engineered_dim):
+                        raise ValueError("Sequence model engineered feature size mismatch")
                 expected = getattr(bundle.model, "n_features_in_", None)
                 if expected is not None and int(expected) != int(expected_input_dim):
                     raise ValueError("Model feature size mismatch")

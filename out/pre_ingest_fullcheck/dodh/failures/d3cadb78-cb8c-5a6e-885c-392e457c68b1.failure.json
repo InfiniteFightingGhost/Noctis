@@ -1,0 +1,23 @@
+{
+  "dataset": "dodh",
+  "source_path": "/home/andy/Datasets/dodh/dodh/d3cadb78-cb8c-5a6e-885c-392e457c68b1.h5",
+  "error_code": "E_CHANNEL_AMBIGUOUS",
+  "message": "Multiple H5 channels matched same pattern",
+  "details": {
+    "pattern": "/signals/eeg/**",
+    "matches": [
+      "/signals/eeg/C3_M2",
+      "/signals/eeg/F3_F4",
+      "/signals/eeg/F3_M2",
+      "/signals/eeg/F3_O1",
+      "/signals/eeg/F4_M1",
+      "/signals/eeg/F4_O2",
+      "/signals/eeg/FP1_F3",
+      "/signals/eeg/FP1_M2",
+      "/signals/eeg/FP1_O1",
+      "/signals/eeg/FP2_F4",
+      "/signals/eeg/FP2_M1",
+      "/signals/eeg/FP2_O2"
+    ]
+  }
+}

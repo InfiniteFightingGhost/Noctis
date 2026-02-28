@@ -1,0 +1,26 @@
+{
+  "datasets": {
+    "dodh": {
+      "records": 32,
+      "epochs": 0,
+      "avg_valid_ratio": 0.0
+    },
+    "cap": {
+      "records": 108,
+      "epochs": 69656,
+      "avg_valid_ratio": 0.6424726816875762
+    },
+    "isruc": {
+      "records": 126,
+      "epochs": 0,
+      "avg_valid_ratio": 0.0
+    }
+  },
+  "total_records": 266,
+  "error_code_counts": {
+    "E_CHANNEL_AMBIGUOUS": 35,
+    "E_CONTRACT_VIOLATION": 34,
+    "E_QC_FAIL": 1,
+    "E_UNSUPPORTED_REC": 126
+  }
+}

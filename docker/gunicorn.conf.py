@@ -1,5 +1,11 @@
-bind = "0.0.0.0:8000"
-workers = 2
+import os
+
+
+bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"
+workers = int(os.getenv("WEB_CONCURRENCY", "2"))
 worker_class = "uvicorn.workers.UvicornWorker"
-timeout = 120
-keepalive = 5
+timeout = int(os.getenv("GUNICORN_TIMEOUT", "120"))
+graceful_timeout = int(os.getenv("GUNICORN_GRACEFUL_TIMEOUT", "30"))
+keepalive = int(os.getenv("GUNICORN_KEEPALIVE", "5"))
+max_requests = int(os.getenv("GUNICORN_MAX_REQUESTS", "1000"))
+max_requests_jitter = int(os.getenv("GUNICORN_MAX_REQUESTS_JITTER", "100"))

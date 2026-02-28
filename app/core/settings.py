@@ -9,7 +9,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", protected_namespaces=()
+        env_file=".env",
+        env_file_encoding="utf-8",
+        protected_namespaces=(),
+        extra="ignore",
     )
 
     app_name: str = "noctis-ml-api"
@@ -22,6 +25,14 @@ class Settings(BaseSettings):
     jwt_audience: str = "noctis-services"
     jwt_allowed_algorithms: list[str] = ["RS256", "HS256"]
     jwt_leeway_seconds: int = 30
+    auth_jwt_secret: str = "local-dev-user-auth-secret-change-me"
+    auth_jwt_algorithm: str = "HS256"
+    auth_jwt_issuer: str = "noctis-user-auth"
+    auth_jwt_audience: str = "noctis-users"
+    auth_access_token_ttl_seconds: int = 3600
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 60
     default_tenant_id: str = "00000000-0000-0000-0000-000000000001"
 
     api_key_header: str = "X-API-Key"
@@ -48,6 +59,13 @@ class Settings(BaseSettings):
 
     request_timeout_seconds: float = 30.0
 
+    rate_limit_enabled: bool = True
+    rate_limit_window_seconds: int = 60
+    rate_limit_auth_requests: int = 30
+    rate_limit_predict_requests: int = 120
+    rate_limit_ingest_requests: int = 240
+    rate_limit_default_requests: int = 600
+
     db_retry_max_attempts: int = 3
     db_retry_base_delay_seconds: float = 0.2
     db_retry_max_delay_seconds: float = 2.0
@@ -62,6 +80,7 @@ class Settings(BaseSettings):
     performance_sample_size: int = 250
     inference_batch_size: int = 64
     enable_batch_inference: bool = True
+    predict_async_persistence: bool = True
 
     epochs_retention_days: int = 90
     predictions_retention_days: int = 180
@@ -82,6 +101,8 @@ class Settings(BaseSettings):
     promotion_min_accuracy: float = 0.8
     promotion_min_macro_f1: float = 0.7
     promotion_block_if_missing_metrics: bool = True
+
+    verify_model_artifact_hash: bool = False
 
     retrain_poll_interval_seconds: float = 60.0
     retrain_batch_size: int = 1

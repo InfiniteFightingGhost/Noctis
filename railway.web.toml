@@ -1,0 +1,24 @@
+# ============================================================
+# Noctis — Frontend (noctis-web) Railway service config
+#
+# In the Railway UI, set "Config file path" to: railway.web.toml
+#
+# Required env vars (set in Railway UI for this service):
+#   VITE_API_BASE_URL   — public URL of the noctis-api service
+#                         e.g. https://noctis-api.up.railway.app
+#   VITE_USE_MOCK_API   — set to "false" (default)
+# ============================================================
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "docker/Dockerfile.web"
+
+# VITE_API_BASE_URL must be a build arg because Vite bakes env vars
+# into the JS bundle at build time, not at runtime.
+buildArgs = { VITE_API_BASE_URL = "$VITE_API_BASE_URL", VITE_USE_MOCK_API = "false" }
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 10
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

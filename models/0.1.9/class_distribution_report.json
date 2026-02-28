@@ -1,0 +1,40 @@
+{
+  "datasets": {
+    "UNKNOWN": {
+      "samples": 244705,
+      "counts": {
+        "N1": 21081,
+        "N2": 88671,
+        "N3": 51667,
+        "REM": 39627,
+        "W": 43659
+      },
+      "proportions": {
+        "N1": 0.0861486279397642,
+        "N2": 0.3623587585051388,
+        "REM": 0.1619378435258781
+      },
+      "n2_downweight_applied": false
+    }
+  },
+  "label_map": [
+    "N1",
+    "N2",
+    "N3",
+    "REM",
+    "W"
+  ],
+  "class_weights": {
+    "N1": 1.8180205821990967,
+    "N2": 0.45194971561431885,
+    "N3": 0.8078978061676025,
+    "REM": 1.0284444093704224,
+    "W": 0.8936870694160461
+  },
+  "class_weight_adjustments": {
+    "n2_adjusted": false,
+    "n2_multiplier_applied": 0.85,
+    "reason": null,
+    "triggered_datasets": []
+  }
+}

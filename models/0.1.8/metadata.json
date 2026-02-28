@@ -1,0 +1,147 @@
+{
+  "version": "0.1.8",
+  "created_at": "2026-02-24T13:08:48.676935+00:00",
+  "random_seed": 42,
+  "dataset_snapshot": {
+    "created_at": "2026-02-24T13:07:45.737171+00:00",
+    "window_size": 21,
+    "epoch_seconds": 30,
+    "allow_padding": false,
+    "padding_policy": "reject",
+    "feature_schema_version": "dreem_v1",
+    "feature_schema_id": "bf820ff5-80c5-445e-ae6d-0bb9f6d5a4fa",
+    "feature_schema_hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
+    "feature_names": [
+      "in_bed_pct",
+      "hr_mean",
+      "hr_std",
+      "dhr",
+      "rr_mean",
+      "rr_std",
+      "drr",
+      "large_move_pct",
+      "minor_move_pct",
+      "turnovers_delta",
+      "apnea_delta",
+      "flags",
+      "vib_move_pct",
+      "vib_resp_q",
+      "agree_flags"
+    ],
+    "feature_schema_path": null,
+    "git_commit_hash": "4ac57936c1985f68da020b3142df3d7c37f2ab83",
+    "filters": {
+      "from_ts": null,
+      "to_ts": null,
+      "device_id": "81af09a2-ed9b-416f-b862-cdfeccef4846",
+      "recording_id": null,
+      "feature_schema_version": null,
+      "model_version": null,
+      "tenant_id": null
+    },
+    "label_strategy": "ground_truth_only",
+    "label_source_policy": "ground_truth_only",
+    "allow_predicted_labels": false,
+    "label_source_counts": {
+      "ground_truth": 110763
+    },
+    "padded_window_count": 0,
+    "balance_strategy": "none",
+    "random_seed": 42,
+    "split_sizes": {
+      "train": 88113,
+      "val": 0,
+      "test": 22650
+    },
+    "label_map": [
+      "N1",
+      "N2",
+      "N3",
+      "REM",
+      "W"
+    ],
+    "split_policy": {
+      "split_strategy": "recording",
+      "seed": 42,
+      "grouping_key": "recording_id",
+      "time_aware": false,
+      "purge_gap": 0,
+      "block_seconds": null
+    },
+    "window_alignment": {
+      "end_ts": "epoch_start_plus_duration",
+      "epoch_seconds": 30,
+      "padding_policy": "reject",
+      "alignment": "epoch_end"
+    },
+    "window_stride": 1,
+    "dataset_snapshot_id": "e73f508e-d15c-4727-b6d6-feff743d8314",
+    "dataset_snapshot_checksum": "0581b0f70adba92ccc089c184dd7346f22160db920f8da21ab6f64b1c5d898c3",
+    "dataset_snapshot_row_count": 110763,
+    "recording_filter": {
+      "from_ts": null,
+      "to_ts": null,
+      "device_id": "81af09a2-ed9b-416f-b862-cdfeccef4846",
+      "recording_id": null,
+      "feature_schema_version": "dreem_v1",
+      "model_version": null,
+      "tenant_id": null,
+      "window_size": 21,
+      "epoch_seconds": 30,
+      "allow_padding": false,
+      "window_alignment": "epoch_end",
+      "padding_policy": "reject",
+      "label_source_policy": "ground_truth_only",
+      "label_strategy": "ground_truth_only",
+      "allow_predicted_labels": false,
+      "balance_strategy": "none",
+      "random_seed": 42,
+      "split_strategy": "recording",
+      "split_time_aware": false,
+      "split_purge_gap": 0,
+      "split_block_seconds": null,
+      "split": {
+        "train": 0.8,
+        "val": 0.0,
+        "test": 0.2
+      }
+    }
+  },
+  "dataset_snapshot_id": "e73f508e-d15c-4727-b6d6-feff743d8314",
+  "feature_schema_version": "dreem_v1",
+  "feature_schema_hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
+  "model_type": "gradient_boosting",
+  "label_map": [
+    "N1",
+    "N2",
+    "N3",
+    "REM",
+    "W"
+  ],
+  "label_map_source": "estimator_classes",
+  "label_map_order_hash": "d066e10dd073840f238094e3d6e8fc2d257dfae0d0afc3b5f46535795e5f7306",
+  "model_classes": [
+    "N1",
+    "N2",
+    "N3",
+    "REM",
+    "W"
+  ],
+  "git_commit_hash": "4ac57936c1985f68da020b3142df3d7c37f2ab83",
+  "metrics_hash": "d8232ca130ad510d6cf40308270e11bed417f899cd164714ddf901ad77aecb79",
+  "artifact_hash": "1a904a390f814384e3a69d733f2750bfa155cf3b90c5e3b4b5426cade52a426f",
+  "feature_strategy": "mean",
+  "window_size": 21,
+  "epoch_seconds": 30,
+  "window_stride": 1,
+  "expected_input_dim": 15,
+  "lineage": {
+    "dataset_snapshot_id": "e73f508e-d15c-4727-b6d6-feff743d8314",
+    "feature_schema_version": "dreem_v1",
+    "feature_schema_hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
+    "training_seed": 42,
+    "git_commit_hash": "4ac57936c1985f68da020b3142df3d7c37f2ab83",
+    "metrics_hash": "d8232ca130ad510d6cf40308270e11bed417f899cd164714ddf901ad77aecb79",
+    "artifact_hash": "1a904a390f814384e3a69d733f2750bfa155cf3b90c5e3b4b5426cade52a426f"
+  }
+}

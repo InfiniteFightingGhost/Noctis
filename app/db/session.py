@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from functools import lru_cache
-from typing import Callable, Iterator, TypeVar, cast
+from typing import Callable, TypeVar, cast
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import DBAPIError, OperationalError, SQLAlchemyError
@@ -172,11 +172,3 @@ def run_with_db_retry(
     if last_error:
         raise last_error
     raise RuntimeError("DB retry failed without exception")
-
-
-def get_db() -> Iterator[Session]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()

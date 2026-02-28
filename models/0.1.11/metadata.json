@@ -1,0 +1,154 @@
+{
+  "version": "0.1.11",
+  "created_at": "2026-02-24T20:39:28.221061+00:00",
+  "random_seed": 42,
+  "dataset_snapshot": {
+    "created_at": "2026-02-24T12:33:06.268288+00:00",
+    "window_size": 21,
+    "epoch_seconds": 30,
+    "allow_padding": false,
+    "padding_policy": "reject",
+    "feature_schema_version": "dreem_v1",
+    "feature_schema_id": "bf820ff5-80c5-445e-ae6d-0bb9f6d5a4fa",
+    "feature_schema_hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
+    "feature_names": [
+      "in_bed_pct",
+      "hr_mean",
+      "hr_std",
+      "dhr",
+      "rr_mean",
+      "rr_std",
+      "drr",
+      "large_move_pct",
+      "minor_move_pct",
+      "turnovers_delta",
+      "apnea_delta",
+      "flags",
+      "vib_move_pct",
+      "vib_resp_q",
+      "agree_flags"
+    ],
+    "feature_schema_path": null,
+    "git_commit_hash": "4ac57936c1985f68da020b3142df3d7c37f2ab83",
+    "filters": {
+      "from_ts": null,
+      "to_ts": null,
+      "device_id": null,
+      "recording_id": null,
+      "feature_schema_version": null,
+      "model_version": null,
+      "tenant_id": null
+    },
+    "label_strategy": "ground_truth_only",
+    "label_source_policy": "ground_truth_only",
+    "allow_predicted_labels": false,
+    "label_source_counts": {
+      "ground_truth": 244705
+    },
+    "padded_window_count": 0,
+    "balance_strategy": "none",
+    "random_seed": 42,
+    "split_sizes": {
+      "train": 196359,
+      "val": 0,
+      "test": 48346
+    },
+    "label_map": [
+      "N1",
+      "N2",
+      "N3",
+      "REM",
+      "W"
+    ],
+    "split_policy": {
+      "split_strategy": "recording",
+      "seed": 42,
+      "grouping_key": "recording_id",
+      "time_aware": false,
+      "purge_gap": 0,
+      "block_seconds": null
+    },
+    "window_alignment": {
+      "end_ts": "epoch_start_plus_duration",
+      "epoch_seconds": 30,
+      "padding_policy": "reject",
+      "alignment": "epoch_end"
+    },
+    "window_stride": 1,
+    "dataset_snapshot_id": "7b982b51-b5bf-4166-9a3b-a9054e18b4c8",
+    "dataset_snapshot_checksum": "0bcc11b786af63555c773bf515c5ef4ebaa45333a70fe2362815c47f5427cbf4",
+    "dataset_snapshot_row_count": 244705,
+    "recording_filter": {
+      "from_ts": null,
+      "to_ts": null,
+      "device_id": null,
+      "recording_id": null,
+      "feature_schema_version": "dreem_v1",
+      "model_version": null,
+      "tenant_id": null,
+      "window_size": 21,
+      "epoch_seconds": 30,
+      "allow_padding": false,
+      "window_alignment": "epoch_end",
+      "padding_policy": "reject",
+      "label_source_policy": "ground_truth_only",
+      "label_strategy": "ground_truth_only",
+      "allow_predicted_labels": false,
+      "balance_strategy": "none",
+      "random_seed": 42,
+      "split_strategy": "recording",
+      "split_time_aware": false,
+      "split_purge_gap": 0,
+      "split_block_seconds": null,
+      "split": {
+        "train": 0.8,
+        "val": 0.0,
+        "test": 0.2
+      }
+    }
+  },
+  "dataset_snapshot_id": "7b982b51-b5bf-4166-9a3b-a9054e18b4c8",
+  "feature_schema_version": "dreem_v1",
+  "feature_schema_hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
+  "model_type": "cnn_bilstm",
+  "label_map": [
+    "N1",
+    "N2",
+    "N3",
+    "REM",
+    "W"
+  ],
+  "label_map_source": "estimator_classes",
+  "label_map_order_hash": "d066e10dd073840f238094e3d6e8fc2d257dfae0d0afc3b5f46535795e5f7306",
+  "model_classes": [
+    "N1",
+    "N2",
+    "N3",
+    "REM",
+    "W"
+  ],
+  "git_commit_hash": "d71b587a2f1cb50d2ef37dc60c6d0c2ff1524685",
+  "metrics_hash": "91d02fd44b0dea4c7851aaeda864d077b8ccd7d0c0e460edf31d6f516242a569",
+  "artifact_hash": "2c9276bcd2d4826766dd6991d60a31d5999425b689c9a0a47be2f3162db3c107",
+  "feature_strategy": "sequence",
+  "window_size": 21,
+  "epoch_seconds": 30,
+  "window_stride": 1,
+  "expected_input_dim": 15,
+  "dataset_id_map": {
+    "DODH": 0,
+    "CAP": 1,
+    "ISRUC": 2,
+    "UNKNOWN": 3
+  },
+  "inference_dataset_id": "UNKNOWN",
+  "lineage": {
+    "dataset_snapshot_id": "7b982b51-b5bf-4166-9a3b-a9054e18b4c8",
+    "feature_schema_version": "dreem_v1",
+    "feature_schema_hash": "9213b47fdb2b2df7a282e0206e2f93553cf0ff0f057e9d361293b28b3be8c6ca",
+    "training_seed": 42,
+    "git_commit_hash": "d71b587a2f1cb50d2ef37dc60c6d0c2ff1524685",
+    "metrics_hash": "91d02fd44b0dea4c7851aaeda864d077b8ccd7d0c0e460edf31d6f516242a569",
+    "artifact_hash": "2c9276bcd2d4826766dd6991d60a31d5999425b689c9a0a47be2f3162db3c107"
+  }
+}

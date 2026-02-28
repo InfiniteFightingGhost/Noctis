@@ -1,0 +1,9 @@
+{"epoch": 1, "stage": "pretrain", "train_loss": 0.133769659753855, "learning_rate": 0.001}
+{"epoch": 2, "stage": "pretrain", "train_loss": 0.1265087467240012, "learning_rate": 0.001}
+{"epoch": 3, "stage": "pretrain", "train_loss": 0.1222245961591074, "learning_rate": 0.001}
+{"epoch": 4, "stage": "pretrain", "train_loss": 0.11851973153471249, "learning_rate": 0.001}
+{"epoch": 5, "stage": "pretrain", "train_loss": 0.1153796597789074, "learning_rate": 0.001}
+{"epoch": 6, "stage": "pretrain", "train_loss": 0.11272515845884981, "learning_rate": 0.001}
+{"epoch": 7, "stage": "pretrain", "train_loss": 0.11007362741315183, "learning_rate": 0.001}
+{"epoch": 8, "stage": "pretrain", "train_loss": 0.10738627557071616, "learning_rate": 0.001}
+{"epoch": 1, "stage": "finetune", "train_loss": 1.30473749606666, "val_loss": 1.640383584001077, "val_macro_f1": 0.30751966096553907, "val_rem_recall": 0.12311406155703078, "loss_mode": "weighted_ce", "learning_rate": 0.001}

@@ -1,0 +1,10 @@
+dataset,record_id,source_path,hypnogram_path,artifact_dir,failure_path,recording_db_id,n_epochs,valid_ratio
+dodh,095d6e40-5f19-55b6-a0ec-6e0ad3793da0,/home/andy/Datasets/dodh/dodh/095d6e40-5f19-55b6-a0ec-6e0ad3793da0.h5,/hypnogram,,/home/andy/Projects/Noctis/out/pre_ingest_verify/dodh/failures/095d6e40-5f19-55b6-a0ec-6e0ad3793da0.failure.json,,0,0.0
+dodh,0d79f4b1-e74f-5e87-8e42-f9dd7112ada5,/home/andy/Datasets/dodh/dodh/0d79f4b1-e74f-5e87-8e42-f9dd7112ada5.h5,/hypnogram,,/home/andy/Projects/Noctis/out/pre_ingest_verify/dodh/failures/0d79f4b1-e74f-5e87-8e42-f9dd7112ada5.failure.json,,0,0.0
+dodh,119f9726-eb4c-5a0e-a7bb-9e15256149a1,/home/andy/Datasets/dodh/dodh/119f9726-eb4c-5a0e-a7bb-9e15256149a1.h5,/hypnogram,,/home/andy/Projects/Noctis/out/pre_ingest_verify/dodh/failures/119f9726-eb4c-5a0e-a7bb-9e15256149a1.failure.json,,0,0.0
+cap,brux1,/home/andy/Datasets/capslpdb-1.0.0/brux1.edf,/home/andy/Datasets/capslpdb-1.0.0/brux1.txt,,/home/andy/Projects/Noctis/out/pre_ingest_verify/cap/failures/brux1.failure.json,,0,0.0
+cap,brux2,/home/andy/Datasets/capslpdb-1.0.0/brux2.edf,/home/andy/Datasets/capslpdb-1.0.0/brux2.txt,/home/andy/Projects/Noctis/out/pre_ingest_verify/cap/brux2,,,1037,0.9922854387656702
+cap,ins1,/home/andy/Datasets/capslpdb-1.0.0/ins1.edf,/home/andy/Datasets/capslpdb-1.0.0/ins1.txt,,/home/andy/Projects/Noctis/out/pre_ingest_verify/cap/failures/ins1.failure.json,,0,0.0
+isruc,1,/home/andy/Datasets/isruc/raw/subgroupI/1/1.rec,/home/andy/Datasets/isruc/raw/subgroupI/1/1_1.txt,,/home/andy/Projects/Noctis/out/pre_ingest_verify/isruc/failures/1.failure.json,,0,0.0
+isruc,10,/home/andy/Datasets/isruc/raw/subgroupI/10/10.rec,/home/andy/Datasets/isruc/raw/subgroupI/10/10_1.txt,,/home/andy/Projects/Noctis/out/pre_ingest_verify/isruc/failures/10.failure.json,,0,0.0
+isruc,100,/home/andy/Datasets/isruc/raw/subgroupI/100/100.rec,/home/andy/Datasets/isruc/raw/subgroupI/100/100_1.txt,,/home/andy/Projects/Noctis/out/pre_ingest_verify/isruc/failures/100.failure.json,,0,0.0

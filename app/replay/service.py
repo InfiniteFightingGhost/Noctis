@@ -152,7 +152,12 @@ def _predict(
         feature_dim=feature_dim,
         window_size=int(window_size),
     )
-    probs = model.predict_proba(batch)
+    if str(feature_strategy) == "sequence":
+        dataset_id = str(metadata.get("inference_dataset_id", "UNKNOWN"))
+        dataset_ids = np.full(batch.shape[0], dataset_id, dtype=object)
+        probs = model.predict_proba(batch, dataset_ids=dataset_ids)
+    else:
+        probs = model.predict_proba(batch)
     preds: list[str] = []
     conf: list[float] = []
     for row in probs:

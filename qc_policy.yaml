@@ -1,0 +1,18 @@
+required_channels:
+  - ecg
+optional_channels:
+  - resp
+  - eeg
+  - emg
+  - movement
+checks:
+  nan_inf_fraction_max: 0.02
+  flatline_fraction_max: 0.9
+  clipping_fraction_max: 0.3
+  variance_min: 1.0e-8
+  fs_consistency_tolerance: 1.0e-3
+  ecg_range_abs_max: 10000.0
+  ecg_min_peak_count: 5
+  eeg_psd_low_band_hz: [0.5, 4.0]
+  eeg_psd_high_band_hz: [20.0, 40.0]
+  eeg_psd_ratio_min: 0.01

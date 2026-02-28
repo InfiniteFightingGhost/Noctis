@@ -1,0 +1,370 @@
+{
+  "class_order": [
+    "W",
+    "Light",
+    "Deep",
+    "REM"
+  ],
+  "nights": [
+    {
+      "recording_id": "125f4d80-3bea-4b98-b36e-d33e5a33760c",
+      "dataset_id": "DODH",
+      "samples": 940,
+      "macro_f1": 0.2043104410943607,
+      "mcc": -0.036491843027161956,
+      "kappa": -0.02966750486729376,
+      "brier": 0.697042581992976,
+      "ece": 0.11574303986544304,
+      "transition_matrix_error_raw": 628.0,
+      "transition_matrix_error_norm": 1.5949929189401857,
+      "transition_entropy_diff": 0.17012657813151866,
+      "hypnogram_edit_distance_raw": 520,
+      "hypnogram_edit_distance_norm": 0.5531914893617021,
+      "fragmentation_error": 0.07458636740428162,
+      "impossible_transition_rate": 0.0,
+      "wake_deep_direct_rate": 0.0,
+      "clinical_true": {
+        "tst_min": 459.5,
+        "se": 0.9776595744680852,
+        "rem_pct": 0.2295973884657236,
+        "n3_pct": 0.2840043525571273,
+        "rem_latency_min": 159.5,
+        "waso_min": 10.5
+      },
+      "clinical_pred": {
+        "tst_min": 468.0,
+        "se": 0.9957446808510638,
+        "rem_pct": 0.0,
+        "n3_pct": 0.20192307692307693,
+        "rem_latency_min": 0.0,
+        "waso_min": 0.0
+      },
+      "clinical_error": {
+        "n3_pct": {
+          "mae": 0.08208127563405038,
+          "ape": 0.28901414677276743
+        },
+        "rem_latency_min": {
+          "mae": 159.5,
+          "ape": 1.0
+        },
+        "rem_pct": {
+          "mae": 0.2295973884657236,
+          "ape": 1.0
+        },
+        "se": {
+          "mae": 0.018085106382978666,
+          "ape": 0.0184983677910772
+        },
+        "tst_min": {
+          "mae": 8.5,
+          "ape": 0.018498367791077257
+        },
+        "waso_min": {
+          "mae": 10.5,
+          "ape": 1.0
+        }
+      }
+    },
+    {
+      "recording_id": "22368fa5-e533-4965-b6a3-99f464b91724",
+      "dataset_id": "DODH",
+      "samples": 935,
+      "macro_f1": 0.3407509861175145,
+      "mcc": 0.1289666589188597,
+      "kappa": 0.0830120812516471,
+      "brier": 0.682206536931481,
+      "ece": 0.28625169785264976,
+      "transition_matrix_error_raw": 672.0,
+      "transition_matrix_error_norm": 2.5114891022495804,
+      "transition_entropy_diff": 0.14243474892457986,
+      "hypnogram_edit_distance_raw": 361,
+      "hypnogram_edit_distance_norm": 0.386096256684492,
+      "fragmentation_error": 0.12702732148956472,
+      "impossible_transition_rate": 0.0,
+      "wake_deep_direct_rate": 0.0,
+      "clinical_true": {
+        "tst_min": 420.5,
+        "se": 0.8994652406417112,
+        "rem_pct": 0.3103448275862069,
+        "n3_pct": 0.0,
+        "rem_latency_min": 64.5,
+        "waso_min": 33.5
+      },
+      "clinical_pred": {
+        "tst_min": 447.0,
+        "se": 0.9561497326203209,
+        "rem_pct": 0.0,
+        "n3_pct": 0.03131991051454139,
+        "rem_latency_min": 0.0,
+        "waso_min": 18.0
+      },
+      "clinical_error": {
+        "n3_pct": {
+          "mae": 0.03131991051454139,
+          "ape": 0.0
+        },
+        "rem_latency_min": {
+          "mae": 64.5,
+          "ape": 1.0
+        },
+        "rem_pct": {
+          "mae": 0.3103448275862069,
+          "ape": 1.0
+        },
+        "se": {
+          "mae": 0.0566844919786097,
+          "ape": 0.06302021403091566
+        },
+        "tst_min": {
+          "mae": 26.5,
+          "ape": 0.06302021403091558
+        },
+        "waso_min": {
+          "mae": 15.5,
+          "ape": 0.4626865671641791
+        }
+      }
+    },
+    {
+      "recording_id": "2a3fa418-cfb1-470d-accc-d7b5cf31bccd",
+      "dataset_id": "DODH",
+      "samples": 990,
+      "macro_f1": 0.2862466513585916,
+      "mcc": 0.13676842173504702,
+      "kappa": 0.12744525045552998,
+      "brier": 0.677804857297462,
+      "ece": 0.3518481541161585,
+      "transition_matrix_error_raw": 290.0,
+      "transition_matrix_error_norm": 1.6223513972074548,
+      "transition_entropy_diff": 0.22721903183416853,
+      "hypnogram_edit_distance_raw": 254,
+      "hypnogram_edit_distance_norm": 0.25656565656565655,
+      "fragmentation_error": 0.1534022890614317,
+      "impossible_transition_rate": 0.0,
+      "wake_deep_direct_rate": 0.0,
+      "clinical_true": {
+        "tst_min": 421.5,
+        "se": 0.8515151515151516,
+        "rem_pct": 0.0771055753262159,
+        "n3_pct": 0.03795966785290629,
+        "rem_latency_min": 296.0,
+        "waso_min": 70.5
+      },
+      "clinical_pred": {
+        "tst_min": 438.5,
+        "se": 0.8858585858585859,
+        "rem_pct": 0.0,
+        "n3_pct": 0.01710376282782212,
+        "rem_latency_min": 0.0,
+        "waso_min": 44.0
+      },
+      "clinical_error": {
+        "n3_pct": {
+          "mae": 0.02085590502508417,
+          "ape": 0.549422748004561
+        },
+        "rem_latency_min": {
+          "mae": 296.0,
+          "ape": 1.0
+        },
+        "rem_pct": {
+          "mae": 0.0771055753262159,
+          "ape": 1.0
+        },
+        "se": {
+          "mae": 0.03434343434343434,
+          "ape": 0.040332147093712925
+        },
+        "tst_min": {
+          "mae": 17.0,
+          "ape": 0.04033214709371293
+        },
+        "waso_min": {
+          "mae": 26.5,
+          "ape": 0.375886524822695
+        }
+      }
+    },
+    {
+      "recording_id": "505be011-5eec-4d02-be94-c6c0585eec6f",
+      "dataset_id": "DODH",
+      "samples": 945,
+      "macro_f1": 0.2515584084259697,
+      "mcc": 0.2136526689073817,
+      "kappa": 0.1369226799690376,
+      "brier": 0.6893689638176482,
+      "ece": 0.16447007324960494,
+      "transition_matrix_error_raw": 1252.0,
+      "transition_matrix_error_norm": 1.557186949694344,
+      "transition_entropy_diff": 0.17717925655062916,
+      "hypnogram_edit_distance_raw": 669,
+      "hypnogram_edit_distance_norm": 0.707936507936508,
+      "fragmentation_error": 0.17067612010227762,
+      "impossible_transition_rate": 0.0,
+      "wake_deep_direct_rate": 0.0,
+      "clinical_true": {
+        "tst_min": 390.5,
+        "se": 0.8264550264550264,
+        "rem_pct": 0.24199743918053776,
+        "n3_pct": 0.20998719590268886,
+        "rem_latency_min": 159.0,
+        "waso_min": 79.0
+      },
+      "clinical_pred": {
+        "tst_min": 359.0,
+        "se": 0.7597883597883598,
+        "rem_pct": 0.0,
+        "n3_pct": 0.9707520891364902,
+        "rem_latency_min": 0.0,
+        "waso_min": 0.0
+      },
+      "clinical_error": {
+        "n3_pct": {
+          "mae": 0.7607648932338014,
+          "ape": 3.622910863509749
+        },
+        "rem_latency_min": {
+          "mae": 159.0,
+          "ape": 1.0
+        },
+        "rem_pct": {
+          "mae": 0.24199743918053776,
+          "ape": 1.0
+        },
+        "se": {
+          "mae": 0.06666666666666665,
+          "ape": 0.08066581306017924
+        },
+        "tst_min": {
+          "mae": 31.5,
+          "ape": 0.08066581306017925
+        },
+        "waso_min": {
+          "mae": 79.0,
+          "ape": 1.0
+        }
+      }
+    },
+    {
+      "recording_id": "6349be90-e35c-469c-9e92-363c371c4679",
+      "dataset_id": "DODH",
+      "samples": 988,
+      "macro_f1": 0.1821579236977256,
+      "mcc": -0.06181870561272466,
+      "kappa": -0.03095343042449654,
+      "brier": 0.7024063485072357,
+      "ece": 0.20736185331576265,
+      "transition_matrix_error_raw": 830.0,
+      "transition_matrix_error_norm": 1.503838518982212,
+      "transition_entropy_diff": 0.1326437915664782,
+      "hypnogram_edit_distance_raw": 460,
+      "hypnogram_edit_distance_norm": 0.46558704453441296,
+      "fragmentation_error": 0.14995400683010388,
+      "impossible_transition_rate": 0.0,
+      "wake_deep_direct_rate": 0.0,
+      "clinical_true": {
+        "tst_min": 438.5,
+        "se": 0.8876518218623481,
+        "rem_pct": 0.3169897377423033,
+        "n3_pct": 0.04218928164196123,
+        "rem_latency_min": 75.0,
+        "waso_min": 26.5
+      },
+      "clinical_pred": {
+        "tst_min": 491.5,
+        "se": 0.9949392712550608,
+        "rem_pct": 0.0,
+        "n3_pct": 0.04170905391658189,
+        "rem_latency_min": 0.0,
+        "waso_min": 2.0
+      },
+      "clinical_error": {
+        "n3_pct": {
+          "mae": 0.00048022772537933966,
+          "ape": 0.011382695004261647
+        },
+        "rem_latency_min": {
+          "mae": 75.0,
+          "ape": 1.0
+        },
+        "rem_pct": {
+          "mae": 0.3169897377423033,
+          "ape": 1.0
+        },
+        "se": {
+          "mae": 0.10728744939271262,
+          "ape": 0.12086659064994307
+        },
+        "tst_min": {
+          "mae": 53.0,
+          "ape": 0.12086659064994298
+        },
+        "waso_min": {
+          "mae": 24.5,
+          "ape": 0.9245283018867925
+        }
+      }
+    },
+    {
+      "recording_id": "fa19f64c-51b9-44bc-b13c-6eb41de0aba3",
+      "dataset_id": "DODH",
+      "samples": 970,
+      "macro_f1": 0.26581043372558616,
+      "mcc": 0.20736750957067118,
+      "kappa": 0.11375229386333226,
+      "brier": 0.6944911006890909,
+      "ece": 0.17653385406916905,
+      "transition_matrix_error_raw": 934.0,
+      "transition_matrix_error_norm": 1.1670718062800125,
+      "transition_entropy_diff": 0.11234311510614572,
+      "hypnogram_edit_distance_raw": 468,
+      "hypnogram_edit_distance_norm": 0.4824742268041237,
+      "fragmentation_error": 0.11880872723815836,
+      "impossible_transition_rate": 0.0,
+      "wake_deep_direct_rate": 0.0,
+      "clinical_true": {
+        "tst_min": 448.5,
+        "se": 0.9247422680412372,
+        "rem_pct": 0.2530657748049052,
+        "n3_pct": 0.23634336677814938,
+        "rem_latency_min": 132.5,
+        "waso_min": 33.0
+      },
+      "clinical_pred": {
+        "tst_min": 483.0,
+        "se": 0.9958762886597938,
+        "rem_pct": 0.0,
+        "n3_pct": 0.06832298136645963,
+        "rem_latency_min": 0.0,
+        "waso_min": 0.0
+      },
+      "clinical_error": {
+        "n3_pct": {
+          "mae": 0.16802038541168973,
+          "ape": 0.7109164420485174
+        },
+        "rem_latency_min": {
+          "mae": 132.5,
+          "ape": 1.0
+        },
+        "rem_pct": {
+          "mae": 0.2530657748049052,
+          "ape": 1.0
+        },
+        "se": {
+          "mae": 0.07113402061855667,
+          "ape": 0.07692307692307689
+        },
+        "tst_min": {
+          "mae": 34.5,
+          "ape": 0.07692307692307693
+        },
+        "waso_min": {
+          "mae": 33.0,
+          "ape": 1.0
+        }
+      }
+    }
+  ]
+}

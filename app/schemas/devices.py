@@ -28,3 +28,23 @@ class DeviceUpdate(BaseSchema):
 
 class DeviceUserLink(BaseSchema):
     user_id: uuid.UUID
+
+
+class DevicePairingStartRequest(BaseSchema):
+    device_id: uuid.UUID | None = None
+    device_external_id: str | None = Field(default=None, max_length=200)
+
+
+class DevicePairingStartResponse(BaseSchema):
+    pairing_session_id: uuid.UUID
+    pairing_code: str
+    expires_at: datetime
+
+
+class DevicePairingClaimRequest(BaseSchema):
+    pairing_session_id: uuid.UUID
+    pairing_code: str = Field(min_length=4, max_length=12)
+
+
+class DeviceClaimByIdRequest(BaseSchema):
+    device_external_id: str = Field(min_length=1, max_length=200)

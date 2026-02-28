@@ -1,0 +1,2 @@
+dataset,record_id,source_path,hypnogram_path,artifact_dir,failure_path,recording_db_id,n_epochs,valid_ratio
+cap,ins1,/home/andy/Datasets/capslpdb-1.0.0/ins1.edf,/home/andy/Datasets/capslpdb-1.0.0/ins1.txt,/home/andy/Projects/Noctis/out/single_verify_cap/cap/ins1,,,916,0.9890829694323144

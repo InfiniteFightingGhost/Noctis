@@ -29,6 +29,17 @@ def map_hypnogram(raw: Iterable) -> tuple[np.ndarray, np.ndarray]:
 
 def map_numeric_stages(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     mapped = np.full(values.shape, -1, dtype=np.int16)
+    numeric_values: list[int] = []
+    for value in values.ravel():
+        try:
+            v = int(value)
+        except (TypeError, ValueError):
+            continue
+        if v not in (-1, 9, 99):
+            numeric_values.append(v)
+
+    use_shifted_scheme = bool(numeric_values) and min(numeric_values) >= 1
+
     for idx, value in np.ndenumerate(values):
         try:
             v = int(value)
@@ -36,10 +47,10 @@ def map_numeric_stages(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
             continue
         if v in (-1, 9, 99):
             continue
-        if 0 <= v <= 4:
-            mapped[idx] = v
-        elif 1 <= v <= 5 and values.min() >= 1:
+        if use_shifted_scheme and 1 <= v <= 5:
             mapped[idx] = v - 1
+        elif 0 <= v <= 4:
+            mapped[idx] = v
     stage_known = mapped >= 0
     return mapped.astype(np.int16), stage_known
 

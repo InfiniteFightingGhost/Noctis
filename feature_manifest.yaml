@@ -1,0 +1,92 @@
+version: extractor_hardening_v1
+features:
+  - name: in_bed_pct
+    dtype: float32
+    unit: pct
+    required_channels: []
+    causal: true
+    missing_policy: nan
+  - name: hr_mean
+    dtype: float32
+    unit: bpm
+    required_channels: [ecg]
+    causal: true
+    missing_policy: nan
+  - name: hr_std
+    dtype: float32
+    unit: bpm
+    required_channels: [ecg]
+    causal: true
+    missing_policy: nan
+  - name: dhr
+    dtype: float32
+    unit: bpm
+    required_channels: [ecg]
+    causal: true
+    missing_policy: nan
+  - name: rr_mean
+    dtype: float32
+    unit: brpm
+    required_channels: [ecg]
+    causal: true
+    missing_policy: nan
+  - name: rr_std
+    dtype: float32
+    unit: brpm
+    required_channels: [ecg]
+    causal: true
+    missing_policy: nan
+  - name: drr
+    dtype: float32
+    unit: brpm
+    required_channels: [ecg]
+    causal: true
+    missing_policy: nan
+  - name: large_move_pct
+    dtype: float32
+    unit: pct
+    required_channels: []
+    causal: true
+    missing_policy: nan
+  - name: minor_move_pct
+    dtype: float32
+    unit: pct
+    required_channels: []
+    causal: true
+    missing_policy: nan
+  - name: turnovers_delta
+    dtype: float32
+    unit: count
+    required_channels: []
+    causal: true
+    missing_policy: nan
+  - name: apnea_delta
+    dtype: float32
+    unit: count
+    required_channels: []
+    causal: true
+    missing_policy: nan
+  - name: flags
+    dtype: float32
+    unit: bitmask
+    required_channels: []
+    causal: true
+    missing_policy: zero
+  - name: vib_move_pct
+    dtype: float32
+    unit: pct
+    required_channels: []
+    causal: true
+    missing_policy: nan
+  - name: vib_resp_q
+    dtype: float32
+    unit: score
+    required_channels: [ecg]
+    causal: true
+    missing_policy: nan
+  - name: agree_flags
+    dtype: float32
+    unit: bitmask
+    required_channels: []
+    causal: true
+    missing_policy: zero

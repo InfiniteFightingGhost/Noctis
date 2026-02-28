@@ -76,9 +76,7 @@ def authenticate_token(token: str) -> AuthContext:
             leeway=settings.jwt_leeway_seconds,
         )
     except InvalidTokenError as exc:
-        raise AuthError(
-            code="invalid_token", message="Token validation failed"
-        ) from exc
+        raise AuthError(code="invalid_token", message="Token validation failed") from exc
 
     sub = payload.get("sub")
     tenant_id = payload.get("tenant_id")
@@ -103,6 +101,7 @@ def authenticate_token(token: str) -> AuthContext:
         tenant_id=tenant_uuid,
         scopes=scopes,
         key_id=str(kid),
+        principal_type="service",
     )
 
 

@@ -5,15 +5,9 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 
-
-def _migrate(database_url: str) -> None:
-    config = Config("alembic.ini")
-    config.set_main_option("sqlalchemy.url", database_url)
-    command.upgrade(config, "head")
+from tests.integration.utils import migrate_database
 
 
 @pytest.mark.skipif(
@@ -24,7 +18,7 @@ def _migrate(database_url: str) -> None:
 async def test_multitenant_isolation_and_auth() -> None:
     database_url = os.environ["INTEGRATION_TEST_DATABASE_URL"]
     os.environ["DATABASE_URL"] = database_url
-    _migrate(database_url)
+    migrate_database(database_url)
 
     from app.db.models import Tenant
     from app.db.session import SessionLocal

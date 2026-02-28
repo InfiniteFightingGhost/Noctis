@@ -13,12 +13,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dreem_extractor")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    extract_parser = subparsers.add_parser(
-        "extract", help="Extract features from H5 files"
-    )
-    extract_parser.add_argument(
-        "--input", required=True, help="Input .h5 file or directory"
-    )
+    extract_parser = subparsers.add_parser("extract", help="Extract features from H5 files")
+    extract_parser.add_argument("--input", required=True, help="Input .h5 file or directory")
     extract_parser.add_argument("--output", required=True, help="Output directory")
     extract_parser.add_argument("--config", default=None, help="Path to config YAML")
     extract_parser.add_argument("--manifest", dest="manifest", action="store_true")
@@ -55,9 +51,9 @@ def run_extract(args: argparse.Namespace) -> None:
         manifest_entries.append(
             {
                 "record_id": result.record_id,
-                "npz": str(outputs["npz"]),
-                "metadata": str(outputs["metadata"]),
-                "qc": str(outputs["qc"]),
+                "record_dir": str(outputs["record_dir"]),
+                "features": str(outputs["features"]),
+                "manifest": str(outputs["manifest"]),
             }
         )
         if args.verbose:

@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -97,12 +98,44 @@ def _assert_metrics_thresholds(model: ModelVersion) -> None:
     metrics = model.metrics or {}
     min_accuracy = settings.promotion_min_accuracy
     min_f1 = settings.promotion_min_macro_f1
-    accuracy = float(metrics.get("accuracy") or 0.0)
-    macro_f1 = float(metrics.get("macro_f1") or 0.0)
+    accuracy = _resolve_metric(
+        metrics,
+        [
+            "classification.global.accuracy",
+            "classification.global.balanced_accuracy",
+            "post_decode.balanced_accuracy",
+            "accuracy",
+        ],
+    )
+    macro_f1 = _resolve_metric(
+        metrics,
+        [
+            "classification.global.macro_f1",
+            "post_decode.macro_f1",
+            "macro_f1",
+        ],
+    )
     if accuracy < min_accuracy:
         raise ValueError("Model accuracy below threshold")
     if macro_f1 < min_f1:
         raise ValueError("Model macro F1 below threshold")
+
+
+def _resolve_metric(metrics: dict[str, Any], paths: list[str]) -> float:
+    for path in paths:
+        value: Any = metrics
+        for segment in path.split("."):
+            if not isinstance(value, dict) or segment not in value:
+                value = None
+                break
+            value = value[segment]
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return 0.0
 
 
 def _update_status(

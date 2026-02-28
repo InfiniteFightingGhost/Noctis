@@ -32,6 +32,8 @@ class DatasetSnapshotConfig:
     split_time_aware: bool = False
     split_purge_gap: int = 0
     split_block_seconds: int | None = None
+    split_grouped_stratification: bool = False
+    split_stratify_key: str = "dataset_rem_bucket"
 
 
 def load_snapshot_config(path: Path) -> DatasetSnapshotConfig:
@@ -43,8 +45,8 @@ def snapshot_config_from_payload(payload: dict[str, Any]) -> DatasetSnapshotConf
     filters = payload.get("filters", {}) if isinstance(payload, dict) else {}
     split_payload = payload.get("split", {}) if isinstance(payload, dict) else {}
     split = DatasetSplitConfig(
-        train=float(split_payload.get("train", 0.7)),
-        val=float(split_payload.get("val", 0.15)),
+        train=float(split_payload.get("train", 0.75)),
+        val=float(split_payload.get("val", 0.1)),
         test=float(split_payload.get("test", 0.15)),
     )
     split.validate()
@@ -97,6 +99,8 @@ def snapshot_config_from_payload(payload: dict[str, Any]) -> DatasetSnapshotConf
             if payload.get("split_block_seconds") is not None
             else None
         ),
+        split_grouped_stratification=bool(payload.get("split_grouped_stratification", False)),
+        split_stratify_key=str(payload.get("split_stratify_key", "dataset_rem_bucket")),
     )
     return config
 

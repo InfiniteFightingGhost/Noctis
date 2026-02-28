@@ -141,28 +141,19 @@ def _fill_short_nan_runs(values: np.ndarray, max_gap: int) -> np.ndarray:
     if max_gap <= 0:
         return values
     out = values.copy()
-    idx = 0
-    n = len(out)
-    while idx < n:
-        if not np.isnan(out[idx]):
-            idx += 1
+    last_value = np.nan
+    run_start = -1
+    for idx, value in enumerate(out):
+        if np.isnan(value):
+            if run_start < 0:
+                run_start = idx
             continue
-        start = idx
-        while idx < n and np.isnan(out[idx]):
-            idx += 1
-        end = idx - 1
-        gap_len = end - start + 1
-        prev_idx = start - 1
-        next_idx = idx if idx < n else None
-        if (
-            gap_len <= max_gap
-            and prev_idx >= 0
-            and next_idx is not None
-            and not np.isnan(out[prev_idx])
-            and not np.isnan(out[next_idx])
-        ):
-            fill = np.linspace(out[prev_idx], out[next_idx], gap_len + 2)[1:-1]
-            out[start:idx] = fill
+        if run_start >= 0:
+            gap_len = idx - run_start
+            if gap_len <= max_gap and not np.isnan(last_value):
+                out[run_start:idx] = last_value
+            run_start = -1
+        last_value = value
     return out
 
 
@@ -172,13 +163,12 @@ def _rolling_median(values: np.ndarray, window: int) -> np.ndarray:
     if window % 2 == 0:
         window += 1
     out = values.copy()
-    half = window // 2
     n = len(out)
     for i in range(n):
         if np.isnan(out[i]):
             continue
-        start = max(0, i - half)
-        end = min(n, i + half + 1)
+        start = max(0, i - window + 1)
+        end = i + 1
         median_val = np.nanmedian(out[start:end])
         if not np.isnan(median_val):
             out[i] = median_val
@@ -222,13 +212,12 @@ def _smooth_hr(values: np.ndarray, alpha: float, window: int) -> np.ndarray:
     if window % 2 == 0:
         window += 1
     smoothed = out.copy()
-    half = window // 2
     n = len(out)
     for i in range(n):
         if np.isnan(out[i]):
             continue
-        start = max(0, i - half)
-        end = min(n, i + half + 1)
+        start = max(0, i - window + 1)
+        end = i + 1
         segment = out[start:end]
         if np.all(np.isnan(segment)):
             continue

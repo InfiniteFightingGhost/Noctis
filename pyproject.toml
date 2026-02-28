@@ -8,12 +8,14 @@ dependencies = [
   "numpy",
   "h5py",
   "scipy",
+  "pyedflib",
   "pyyaml",
 ]
 
 [project.scripts]
 extract-h5 = "extractor.cli:main"
 dreem_extractor = "dreem_extractor.cli.main:main"
+validate-extraction-artifact = "extractor_hardened.validator:main"
 
 [tool.ruff]
 line-length = 100

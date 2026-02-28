@@ -1,0 +1,22 @@
+{
+  "version": "extractor_hardening_v1",
+  "label_domain": [-1, 0, 1, 2, 3, 4],
+  "feature_count": 15,
+  "features": [
+    {"name": "in_bed_pct", "dtype": "float32", "unit": "pct", "causal": true},
+    {"name": "hr_mean", "dtype": "float32", "unit": "bpm", "causal": true},
+    {"name": "hr_std", "dtype": "float32", "unit": "bpm", "causal": true},
+    {"name": "dhr", "dtype": "float32", "unit": "bpm", "causal": true},
+    {"name": "rr_mean", "dtype": "float32", "unit": "brpm", "causal": true},
+    {"name": "rr_std", "dtype": "float32", "unit": "brpm", "causal": true},
+    {"name": "drr", "dtype": "float32", "unit": "brpm", "causal": true},
+    {"name": "large_move_pct", "dtype": "float32", "unit": "pct", "causal": true},
+    {"name": "minor_move_pct", "dtype": "float32", "unit": "pct", "causal": true},
+    {"name": "turnovers_delta", "dtype": "float32", "unit": "count", "causal": true},
+    {"name": "apnea_delta", "dtype": "float32", "unit": "count", "causal": true},
+    {"name": "flags", "dtype": "float32", "unit": "bitmask", "causal": true},
+    {"name": "vib_move_pct", "dtype": "float32", "unit": "pct", "causal": true},
+    {"name": "vib_resp_q", "dtype": "float32", "unit": "score", "causal": true},
+    {"name": "agree_flags", "dtype": "float32", "unit": "bitmask", "causal": true}
+  ]
+}

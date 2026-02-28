@@ -1,0 +1,9 @@
+{
+  "dataset": "cap",
+  "source_path": "/home/andy/Datasets/capslpdb-1.0.0/narco2.edf",
+  "error_code": "E_CONTRACT_VIOLATION",
+  "message": "No stage events found in /home/andy/Datasets/capslpdb-1.0.0/narco2.txt",
+  "details": {
+    "exception_type": "ValueError"
+  }
+}

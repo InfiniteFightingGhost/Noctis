@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from logging.config import fileConfig
+import os
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
@@ -15,6 +16,10 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
+
     configured = config.get_main_option("sqlalchemy.url")
     if configured:
         return configured
@@ -22,9 +27,7 @@ def get_url() -> str:
 
 
 def run_migrations_offline() -> None:
-    context.configure(
-        url=get_url(), target_metadata=target_metadata, literal_binds=True
-    )
+    context.configure(url=get_url(), target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 

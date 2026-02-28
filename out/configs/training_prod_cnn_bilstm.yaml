@@ -1,0 +1,101 @@
+dataset_dir: out/snapshots/pretrain_80_20
+output_root: models
+feature_schema_path: out/snapshots/pretrain_80_20/feature_schema.json
+dataset_snapshot_id: null
+
+model_type: cnn_bilstm
+random_seed: 42
+feature_strategy: sequence
+class_balance: none
+allow_predicted_labels: false
+
+split_strategy: recording
+split_seed: 42
+split_grouping_key: recording_id
+split_time_aware: false
+split_grouped_stratification: false
+split_stratify_key: dataset_rem_bucket
+evaluation_split_policy: val_or_test
+enforce_label_map_order: true
+
+version_bump: patch
+experiment_name: prod_multidomain_cnn_bilstm
+metrics_thresholds: {}
+
+model:
+  use_dataset_conditioning: true
+  conditioning_mode: embedding
+  conditioning_embed_dim: 8
+  conv_channels: [64, 128, 128]
+  conv_kernel_size: 5
+  conv_dropout: 0.35
+  lstm_hidden_size: 128
+  lstm_layers: 2
+  lstm_dropout: 0.35
+  head_hidden_dims: [128, 64]
+  head_dropout: 0.35
+  use_residual_blocks: true
+  dilation_schedule: [1, 2, 4]
+
+training:
+  batch_size: 64
+  max_epochs: 72
+  early_stopping_patience: 9
+  early_stopping_min_delta: 0.001
+  loss_type: weighted_ce
+  focal_gamma: 1.8
+  auxiliary_loss_lambda: 0.3
+  learning_rate: 0.0008
+  weight_decay: 0.0001
+  optimizer_beta1: 0.9
+  optimizer_beta2: 0.999
+  scheduler_type: plateau
+  scheduler_factor: 0.5
+  scheduler_patience: 2
+  scheduler_min_lr: 0.000001
+  gradient_clip_norm: 1.0
+  instability_macro_f1_threshold: 0.15
+  n2_class_weight_multiplier: 1.0
+  enable_domain_transfer_tests: true
+  enable_binary_pretraining: true
+  pretrain_epochs: 12
+  pretrain_lr_scale: 1.0
+  pretrain_freeze_primary_head: true
+  class_weight_strategy: log_balanced
+  focal_fallback_enabled: true
+  focal_fallback_gamma: 2.0
+  focal_trigger_rem_recall: 0.60
+  focal_trigger_patience: 2
+  normalization_policy: recording_zscore_then_global
+  hard_mining_enabled: true
+  hard_mining_fraction: 0.2
+  hard_mining_oversample_factor: 2.5
+
+evaluation:
+  calibration_bins: 15
+  epoch_seconds: 30
+  forbidden_transitions:
+    - [2, 3]
+    - [3, 2]
+  hard_thresholds:
+    macro_f1_min: 0.75
+    mcc_min: 0.70
+    worst_decile_macro_f1_min: 0.50
+    domain_variance_macro_f1_max: 0.15
+    rem_latency_mae_max: 20.0
+    min_class_recall_floor: 0.20
+    rem_recall_floor: 0.60
+    deep_recall_floor: 0.70
+    worst_night_macro_f1_floor: 0.58
+    impossible_transition_rate_max: 0.08
+    wake_deep_direct_rate_max: 0.05
+  soft_thresholds:
+    worst_decile_macro_f1_warn: 0.45
+
+search:
+  method: random
+  param_grid: {}
+  n_iter: 10
+  cv_folds: 5
+
+hyperparameters: {}

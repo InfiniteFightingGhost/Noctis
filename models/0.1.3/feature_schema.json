@@ -1,0 +1,97 @@
+{
+  "id": "44977d69-4327-4e00-ad0b-911272833514",
+  "version": "v1",
+  "hash": "c752b6886b2371b4f3c63d2619948af0a8a634c8a05fa2c6e3405578e1431f23",
+  "features": [
+    {
+      "name": "delta_power",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 0
+    },
+    {
+      "name": "theta_power",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 1
+    },
+    {
+      "name": "alpha_power",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 2
+    },
+    {
+      "name": "beta_power",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 3
+    },
+    {
+      "name": "sigma_power",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 4
+    },
+    {
+      "name": "emg_rms",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 5
+    },
+    {
+      "name": "eog_variance",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 6
+    },
+    {
+      "name": "hr_mean",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 7
+    },
+    {
+      "name": "hrv_rmssd",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 8
+    },
+    {
+      "name": "motion_index",
+      "dtype": "float32",
+      "allowed_range": null,
+      "description": null,
+      "introduced_in_version": "v1",
+      "deprecated_in_version": null,
+      "position": 9
+    }
+  ]
+}

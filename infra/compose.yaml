@@ -20,7 +20,7 @@ services:
   ml-api:
     build: ../apps/py-ml-api
     environment:
-      DATABASE_URL: postgresql+psycopg://noctis:noctis@localhost:5432/noctis_ts
+      DATABASE_URL: postgresql+psycopg://noctis:noctis@timescaledb:5432/noctis_ts
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -30,4 +30,3 @@ services:
 
 volumes:
   timescale_data:
-
