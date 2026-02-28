@@ -71,6 +71,16 @@ async def lifespan(app: FastAPI):
     log = logging.getLogger("app.startup")
     settings = get_settings()
 
+    # Log the DB URL (redact password for security)
+    db_url = settings.database_url
+    if "@" in db_url:
+        scheme, rest = db_url.split("://", 1)
+        user_pass, host_db = rest.split("@", 1)
+        redacted = f"{scheme}://***@{host_db}"
+    else:
+        redacted = db_url
+    log.info("startup_database_url=%s", redacted)
+
     # Try to bootstrap DB schema at startup, but don't block container health.
     # On Railway the managed DB can take time to be ready, so we do a quick
     # 10-attempt wait (20s max) then continue anyway. The actual DB connection
