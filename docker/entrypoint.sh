@@ -19,19 +19,36 @@ print(f"[entrypoint] Database URL: {url.split('@')[1] if '@' in url else 'invali
 if url.startswith("postgresql+psycopg://"):
     url = url.replace("postgresql+psycopg://", "postgresql://", 1)
 
+# Extract the database name from the URL (last part after the last /)
+url_parts = url.rsplit("/", 1)
+db_name = url_parts[1] if len(url_parts) > 1 else "noctis"
+postgres_url = url_parts[0] + "/postgres"  # Connect to default postgres DB to create if needed
+
 for attempt in range(60):
     try:
-        with psycopg.connect(url) as conn:
+        with psycopg.connect(postgres_url) as conn:
             conn.execute("SELECT 1")
-        print(f"[entrypoint] Database reachable (attempt {attempt + 1})", flush=True)
+        print(f"[entrypoint] Database server reachable (attempt {attempt + 1})", flush=True)
         break
     except Exception as e:
         if attempt == 0 or attempt == 59:
-            print(f"[entrypoint] Database not reachable attempt={attempt + 1} error={e}", flush=True)
+            print(f"[entrypoint] Database server not reachable attempt={attempt + 1} error={e}", flush=True)
         time.sleep(1)
 else:
-    print("[entrypoint] Database never became reachable after 60 attempts", file=sys.stderr, flush=True)
+    print("[entrypoint] Database server never became reachable after 60 attempts", file=sys.stderr, flush=True)
     raise SystemExit("Database not reachable")
+
+# Create the database if it doesn't exist
+print(f"[entrypoint] Creating database '{db_name}' if it doesn't exist...", flush=True)
+with psycopg.connect(postgres_url, autocommit=True) as conn:
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (db_name,))
+        exists = cur.fetchone()
+        if not exists:
+            cur.execute(f"CREATE DATABASE {db_name}")
+            print(f"[entrypoint] Created database '{db_name}'", flush=True)
+        else:
+            print(f"[entrypoint] Database '{db_name}' already exists", flush=True)
 
 lock_id = 9423501
 
