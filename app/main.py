@@ -71,10 +71,12 @@ async def lifespan(app: FastAPI):
     log = logging.getLogger("app.startup")
     settings = get_settings()
 
-    # Wait for DB with generous retries — on Railway the managed DB can take
-    # longer to accept connections than the default 3-attempt policy allows.
+    # Try to bootstrap DB schema at startup, but don't block container health.
+    # On Railway the managed DB can take time to be ready, so we do a quick
+    # 10-attempt wait (20s max) then continue anyway. The actual DB connection
+    # will be lazy on first request.
     db_ready = False
-    for attempt in range(1, 31):
+    for attempt in range(1, 11):
         try:
 
             def _validate_db(session):
@@ -85,11 +87,10 @@ async def lifespan(app: FastAPI):
             break
         except Exception as exc:
             log.warning("startup_db_not_ready attempt=%d error=%s", attempt, exc)
-            await anyio.sleep(min(2.0 * attempt, 10.0))
+            if attempt < 10:
+                await anyio.sleep(min(2.0 * attempt, 5.0))
 
-    if not db_ready:
-        log.error("startup_db_unavailable: continuing without schema bootstrap")
-    else:
+    if db_ready:
         try:
 
             def _bootstrap_schema(session):
@@ -108,6 +109,8 @@ async def lifespan(app: FastAPI):
             )
         except Exception as exc:
             log.error("startup_schema_bootstrap_failed error=%s", exc)
+    else:
+        log.warning("startup_db_unavailable: schema bootstrap deferred to first request")
 
     # Model load failure is non-fatal — get_loaded() will retry on first request.
     try:
