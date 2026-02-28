@@ -38,17 +38,30 @@ else:
     print("[entrypoint] Database server never became reachable after 60 attempts", file=sys.stderr, flush=True)
     raise SystemExit("Database not reachable")
 
-# Create the database if it doesn't exist
-print(f"[entrypoint] Creating database '{db_name}' if it doesn't exist...", flush=True)
-with psycopg.connect(postgres_url, autocommit=True) as conn:
-    with conn.cursor() as cur:
-        cur.execute(f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (db_name,))
-        exists = cur.fetchone()
-        if not exists:
-            cur.execute(f"CREATE DATABASE {db_name}")
-            print(f"[entrypoint] Created database '{db_name}'", flush=True)
-        else:
-            print(f"[entrypoint] Database '{db_name}' already exists", flush=True)
+# Skip database creation if we're connecting directly to an existing database
+if url_parts[0].endswith(f":5432/{db_name}"):
+    print(f"[entrypoint] Connected directly to database '{db_name}' - skipping creation check", flush=True)
+else:
+    # Create the database if it doesn't exist
+    print(f"[entrypoint] Creating database '{db_name}' if it doesn't exist...", flush=True)
+    try:
+        with psycopg.connect(postgres_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT 1 FROM pg_catalog.pg_database WHERE datname = %s", (db_name,))
+                exists = cur.fetchone()
+                if not exists:
+                    cur.execute(f"CREATE DATABASE {db_name}")
+                    print(f"[entrypoint] Created database '{db_name}'", flush=True)
+                else:
+                    print(f"[entrypoint] Database '{db_name}' already exists", flush=True)
+    except psycopg.errors.DuplicateDatabase:
+        print(f"[entrypoint] Database '{db_name}' already exists (DuplicateDatabase error handled)", flush=True)
+    except Exception as e:
+        print(f"[entrypoint] Error checking/creating database: {e}", file=sys.stderr, flush=True)
+        raise SystemExit("Failed to check/create database")
+except Exception as e:
+    print(f"[entrypoint] Error checking/creating database: {e}", file=sys.stderr, flush=True)
+    raise SystemExit("Failed to check/create database")
 
 lock_id = 9423501
 
