@@ -289,8 +289,10 @@ void loop() {
       Serial.println("-------------\n");
     } else if (cmd_upper == "ERASE") {
       Serial.println("!!! This will erase all data. Type 'CONFIRM' to proceed.");
+      Serial.setTimeout(10000); // Increase timeout to 10s for confirmation
       String confirm = Serial.readStringUntil('\n');
       confirm.trim();
+      Serial.setTimeout(1000); // Reset timeout to default
       if(confirm == "CONFIRM") {
         Serial.println("Erasing chip...");
         flash.eraseChip();
@@ -321,6 +323,12 @@ void loop() {
     } else if (cmd_upper.startsWith("SET_API_KEY ")) {
         String key = raw_cmd.substring(12);
         setAPIKey(key);
+    } else if (cmd_upper == "GET_API_KEY") {
+        String key = getAPIKey();
+        Serial.print("Current API Key: ");
+        Serial.println(key);
+    } else if (cmd_upper == "PING_API") {
+        pingAPI();
     } else if (cmd_upper == "UPLOAD_NOW") {
         uploadBacklog();
     } else if (cmd_upper == "WIFI_SCAN") {
@@ -451,6 +459,13 @@ void processEpoch() {
 // SAVE CHUNK TO FLASH
 // ================================================================
 void saveChunkToFlash() {
+  // Check if flash is full before proceeding
+  if (flashWriteAddr + sizeof(DataChunk) > flash.getCapacity()) {
+    // This could be made smarter, e.g. set a flag to only print once
+    Serial.println("!!! Flash memory is full! Cannot save new chunk. Please ERASE.");
+    return;
+  }
+
   currentChunk.header.timestamp  = rtc.now().unixtime() - (EPOCH_SECONDS * CHUNK_EPOCHS);
   currentChunk.header.num_epochs = CHUNK_EPOCHS;
   currentChunk.header.crc16      = calculateCRC16((uint8_t*)&currentChunk.epochs, sizeof(currentChunk.epochs));
@@ -459,7 +474,12 @@ void saveChunkToFlash() {
   if (sectorAddr != lastErasedDataSector) {
     uint8_t testByte = flash.readByte(flashWriteAddr);
     if (testByte != 0xFF) {
-      flash.eraseSector(sectorAddr);
+      if (!flash.eraseSector(sectorAddr)) {
+        char reason[50];
+        sprintf(reason, "Flash erase failed at addr %lu", sectorAddr);
+        set_system_error_state(reason);
+        return;
+      }
       delay(100);
     }
     lastErasedDataSector = sectorAddr;
