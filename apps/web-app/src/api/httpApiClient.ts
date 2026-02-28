@@ -21,6 +21,7 @@ import {
   type ActionResponse,
   type AuthResponse,
   type BackendDeviceResponse,
+  type BackendSleepSummary,
   type ConnectDeviceRequest,
   type DataExportResponse,
   type DevicePairingStartRequest,
@@ -59,12 +60,22 @@ type RequestConfig<T> = {
 
 const DEFAULT_TIMEOUT_MS = 6000;
 const MAX_RETRIES = 1;
+const NO_DATA_STATUSES = new Set([404, 405]);
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
-const API_PREFIX = (import.meta.env.VITE_API_V1_PREFIX ?? "/v1").replace(/\/$/, "");
+const API_PREFIX = ((import.meta.env.VITE_API_V1_PREFIX as string | undefined)?.trim() || "/v1").replace(/\/$/, "");
 const REFRESH_PATH = "/auth/refresh";
 
 let refreshInFlight: Promise<boolean> | null = null;
+
+function deriveUsername(username: string | undefined, email: string): string {
+  if (username && username.trim().length > 0) {
+    return username.trim();
+  }
+
+  const emailPrefix = email.split("@")[0]?.trim();
+  return emailPrefix && emailPrefix.length > 0 ? emailPrefix : "user";
+}
 
 function getErrorMessage(status: number): string {
   if (status >= 500) {
@@ -74,6 +85,243 @@ function getErrorMessage(status: number): string {
     return "Request could not be completed.";
   }
   return "Unexpected API response.";
+}
+
+function extractApiErrorMessage(payload: unknown, fallbackMessage: string): string {
+  if (!payload || typeof payload !== "object") {
+    return fallbackMessage;
+  }
+
+  if ("message" in payload && typeof payload.message === "string") {
+    return payload.message;
+  }
+
+  if (
+    "error" in payload &&
+    payload.error &&
+    typeof payload.error === "object" &&
+    "message" in payload.error &&
+    typeof payload.error.message === "string"
+  ) {
+    return payload.error.message;
+  }
+
+  if ("detail" in payload && typeof payload.detail === "string") {
+    return payload.detail;
+  }
+
+  return fallbackMessage;
+}
+
+function isNoDataError(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status !== null && NO_DATA_STATUSES.has(error.status);
+}
+
+function normalizeStageLabel(stage: string): "wake" | "light" | "deep" | "rem" {
+  const normalized = stage.trim().toLowerCase();
+  if (normalized === "wake" || normalized === "awake" || normalized === "w") {
+    return "wake";
+  }
+  if (normalized === "deep" || normalized === "n3") {
+    return "deep";
+  }
+  if (normalized === "rem" || normalized === "r") {
+    return "rem";
+  }
+  return "light";
+}
+
+function buildEmptyHome(): HomeResponse {
+  return homeSchema.parse({
+    date: new Date().toISOString().slice(0, 10),
+    metrics: {
+      sleepScore: 0,
+      totalSleepMinutes: 0,
+      sleepEfficiency: 0,
+      remPercent: 0,
+      deepPercent: 0,
+      deltaVs7DayBaseline: {
+        sleepScore: 0,
+        totalSleepMinutes: 0,
+        sleepEfficiency: 0,
+        remPercent: 0,
+        deepPercent: 0,
+      },
+    },
+    summaryHypnogram: {
+      confidenceSummary: "No data for now.",
+      epochs: [],
+    },
+    stageBreakdown: [],
+    latencyTriplet: {
+      sleepOnsetMinutes: 0,
+      remLatencyMinutes: 0,
+      deepLatencyMinutes: 0,
+    },
+    continuityMetrics: {
+      fragmentationIndex: 0,
+      entropy: 0,
+      wasoMinutes: 0,
+    },
+    aiSummary: "No data for now.",
+  });
+}
+
+function buildHomeFromSummary(summary: BackendSleepSummary): HomeResponse {
+  const bins = summary.stages?.bins ?? [];
+  const stagePct = summary.stages?.pct;
+  const totalSleepMinutes = summary.totals.totalSleepMin;
+
+  return homeSchema.parse({
+    date: summary.dateLocal,
+    metrics: {
+      sleepScore: summary.score,
+      totalSleepMinutes,
+      sleepEfficiency: summary.totals.sleepEfficiencyPct,
+      remPercent: stagePct?.rem ?? 0,
+      deepPercent: summary.metrics.deepPct ?? stagePct?.deep ?? 0,
+      deltaVs7DayBaseline: {
+        sleepScore: 0,
+        totalSleepMinutes: 0,
+        sleepEfficiency: 0,
+        remPercent: 0,
+        deepPercent: 0,
+      },
+    },
+    summaryHypnogram: {
+      confidenceSummary: summary.insight?.text ?? "No confidence summary available.",
+      epochs: bins.map((bin, index) => {
+        const stage = normalizeStageLabel(bin.stage);
+        return {
+          epochIndex: index,
+          stage,
+          confidence: 0,
+          probabilities: {
+            wake: stage === "wake" ? 1 : 0,
+            light: stage === "light" ? 1 : 0,
+            deep: stage === "deep" ? 1 : 0,
+            rem: stage === "rem" ? 1 : 0,
+          },
+        };
+      }),
+    },
+    stageBreakdown: stagePct
+      ? [
+          { stage: "wake", minutes: Math.round((totalSleepMinutes * stagePct.awake) / 100), percent: stagePct.awake },
+          { stage: "light", minutes: Math.round((totalSleepMinutes * stagePct.light) / 100), percent: stagePct.light },
+          { stage: "deep", minutes: Math.round((totalSleepMinutes * stagePct.deep) / 100), percent: stagePct.deep },
+          { stage: "rem", minutes: Math.round((totalSleepMinutes * stagePct.rem) / 100), percent: stagePct.rem },
+        ]
+      : [],
+    latencyTriplet: {
+      sleepOnsetMinutes: 0,
+      remLatencyMinutes: 0,
+      deepLatencyMinutes: 0,
+    },
+    continuityMetrics: {
+      fragmentationIndex: 0,
+      entropy: 0,
+      wasoMinutes: 0,
+    },
+    aiSummary: summary.insight?.text ?? "No data for now.",
+  });
+}
+
+function buildEmptyTrends(filter: TrendsFilter): TrendsResponse {
+  return trendsSchema.parse({
+    activeFilter: filter,
+    nights: [],
+    movingAverageWindow: 7,
+    varianceBand: { lower: 0, upper: 0 },
+    worstNightDecile: { date: "", sleepScore: 0 },
+  });
+}
+
+function buildTrendsFromSummary(summary: BackendSleepSummary, filter: TrendsFilter): TrendsResponse {
+  const stagePct = summary.stages?.pct;
+  return trendsSchema.parse({
+    activeFilter: filter,
+    nights: [
+      {
+        date: summary.dateLocal,
+        sleepScore: summary.score,
+        totalSleepMinutes: summary.totals.totalSleepMin,
+        sleepEfficiency: summary.totals.sleepEfficiencyPct,
+        remPercent: stagePct?.rem ?? 0,
+        deepPercent: summary.metrics.deepPct ?? stagePct?.deep ?? 0,
+        fragmentationIndex: 0,
+        hrMean: summary.metrics.avgHrBpm,
+        hrv: 0,
+        consistencyIndex: summary.score,
+      },
+    ],
+    movingAverageWindow: 1,
+    varianceBand: { lower: summary.score, upper: summary.score },
+    worstNightDecile: { date: summary.dateLocal, sleepScore: summary.score },
+  });
+}
+
+function buildEmptyNight(): NightResponse {
+  return nightSchema.parse({
+    date: new Date().toISOString().slice(0, 10),
+    epochs: [],
+    transitions: [],
+    arousalIndex: 0,
+    capRateConditional: {
+      available: false,
+      reason: "No data for now.",
+    },
+    cardiopulmonary: {
+      avgRespiratoryRate: 0,
+      minSpO2: 0,
+      avgHeartRate: 0,
+    },
+  });
+}
+
+function buildNightFromSummary(summary: BackendSleepSummary): NightResponse {
+  const bins = summary.stages?.bins ?? [];
+  return nightSchema.parse({
+    date: summary.dateLocal,
+    epochs: bins.map((bin, index) => {
+      const stage = normalizeStageLabel(bin.stage);
+      return {
+        epochIndex: index,
+        stage,
+        confidence: 0,
+        probabilities: {
+          wake: stage === "wake" ? 1 : 0,
+          light: stage === "light" ? 1 : 0,
+          deep: stage === "deep" ? 1 : 0,
+          rem: stage === "rem" ? 1 : 0,
+        },
+      };
+    }),
+    transitions: [],
+    arousalIndex: 0,
+    capRateConditional: {
+      available: false,
+      reason: "No CAP data for now.",
+    },
+    cardiopulmonary: {
+      avgRespiratoryRate: summary.metrics.avgRrBrpm,
+      minSpO2: 0,
+      avgHeartRate: summary.metrics.avgHrBpm,
+    },
+  });
+}
+
+function buildNightsListFromSummary(summary: BackendSleepSummary): NightsListResponse {
+  return nightsListSchema.parse({
+    nights: [
+      {
+        nightId: summary.recordingId,
+        date: summary.dateLocal,
+        label: summary.dateLocal,
+        hasCapData: false,
+      },
+    ],
+  });
 }
 
 function shouldRetry(status: number | null, error: unknown): boolean {
@@ -88,6 +336,10 @@ function shouldRetry(status: number | null, error: unknown): boolean {
 
 function buildApiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!API_BASE_URL) {
+    return `${API_PREFIX}${normalizedPath}`;
+  }
+
   const alreadyPrefixed = API_BASE_URL.endsWith(API_PREFIX);
   return alreadyPrefixed
     ? `${API_BASE_URL}${normalizedPath}`
@@ -185,10 +437,7 @@ async function sendRequest<T>(config: RequestConfig<T>): Promise<T> {
         }
 
         const fallbackMessage = getErrorMessage(response.status);
-        const message =
-          payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
-            ? payload.message
-            : fallbackMessage;
+        const message = extractApiErrorMessage(payload, fallbackMessage);
         throw new ApiError(message, response.status >= 500 ? "server" : "client", response.status);
       }
 
@@ -220,17 +469,95 @@ async function sendRequest<T>(config: RequestConfig<T>): Promise<T> {
 }
 
 export const httpApiClient = {
-  getHome: () => sendRequest<HomeResponse>({ method: "GET", path: "/home", schema: homeSchema }),
-  getTrends: (filter: TrendsFilter = "30D") => {
-    const parsedFilter = trendsFilterSchema.parse(filter);
-    return sendRequest<TrendsResponse>({
-      method: "GET",
-      path: `/trends?filter=${encodeURIComponent(parsedFilter)}`,
-      schema: trendsSchema,
-    });
+  getHome: async () => {
+    try {
+      const summary = await sendRequest({
+        method: "GET",
+        path: "/sleep/latest/summary",
+        schema: backendSleepSummarySchema,
+      });
+      return buildHomeFromSummary(summary);
+    } catch (error) {
+      if (isNoDataError(error)) {
+        return buildEmptyHome();
+      }
+      throw error;
+    }
   },
-  getNightsList: () => sendRequest<NightsListResponse>({ method: "GET", path: "/nights", schema: nightsListSchema }),
-  getNight: () => sendRequest<NightResponse>({ method: "GET", path: "/night", schema: nightSchema }),
+  getTrends: async (filter: TrendsFilter = "30D") => {
+    const parsedFilter = trendsFilterSchema.parse(filter);
+    try {
+      return await sendRequest<TrendsResponse>({
+        method: "GET",
+        path: `/trends?filter=${encodeURIComponent(parsedFilter)}`,
+        schema: trendsSchema,
+      });
+    } catch (error) {
+      if (!isNoDataError(error)) {
+        throw error;
+      }
+
+      try {
+        const summary = await sendRequest({
+          method: "GET",
+          path: "/sleep/latest/summary",
+          schema: backendSleepSummarySchema,
+        });
+        return buildTrendsFromSummary(summary, parsedFilter);
+      } catch (summaryError) {
+        if (isNoDataError(summaryError)) {
+          return buildEmptyTrends(parsedFilter);
+        }
+        throw summaryError;
+      }
+    }
+  },
+  getNightsList: async () => {
+    try {
+      return await sendRequest<NightsListResponse>({ method: "GET", path: "/nights", schema: nightsListSchema });
+    } catch (error) {
+      if (!isNoDataError(error)) {
+        throw error;
+      }
+
+      try {
+        const summary = await sendRequest({
+          method: "GET",
+          path: "/sleep/latest/summary",
+          schema: backendSleepSummarySchema,
+        });
+        return buildNightsListFromSummary(summary);
+      } catch (summaryError) {
+        if (isNoDataError(summaryError)) {
+          return nightsListSchema.parse({ nights: [] });
+        }
+        throw summaryError;
+      }
+    }
+  },
+  getNight: async () => {
+    try {
+      return await sendRequest<NightResponse>({ method: "GET", path: "/night", schema: nightSchema });
+    } catch (error) {
+      if (!isNoDataError(error)) {
+        throw error;
+      }
+
+      try {
+        const summary = await sendRequest({
+          method: "GET",
+          path: "/sleep/latest/summary",
+          schema: backendSleepSummarySchema,
+        });
+        return buildNightFromSummary(summary);
+      } catch (summaryError) {
+        if (isNoDataError(summaryError)) {
+          return buildEmptyNight();
+        }
+        throw summaryError;
+      }
+    }
+  },
   getSettingsProfile: () =>
     sendRequest({
       method: "GET",
@@ -240,7 +567,7 @@ export const httpApiClient = {
       settingsProfileSchemaEndpoint.parse({
         profile: {
           id: profile.id,
-          username: profile.username,
+          username: deriveUsername(profile.username, profile.email),
           email: profile.email,
           createdAt: profile.created_at,
           updatedAt: profile.updated_at,

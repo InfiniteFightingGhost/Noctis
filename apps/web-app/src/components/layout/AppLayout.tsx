@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import { useSyncEvents } from "../../hooks/useSyncEvents";
 import { PrimaryNavigation } from "./PrimaryNavigation";
 
 type ThemePreference = "light" | "dark";
@@ -39,6 +40,7 @@ function getStoredThemePreference(): ThemePreference {
 
 export function AppLayout() {
   const location = useLocation();
+  const syncEvents = useSyncEvents();
   const [isScrolled, setIsScrolled] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -120,6 +122,8 @@ export function AppLayout() {
   );
 
   const isDarkTheme = resolvedTheme === "dark";
+  const isSyncLive = syncEvents.connected && syncEvents.snapshot?.status === "ok";
+  const syncLabel = isSyncLive ? "Live" : "Disconnected";
 
   return (
     <div className="app-shell">
@@ -161,7 +165,10 @@ export function AppLayout() {
 
           <div className="header-right-cluster">
             <span className="avatar-bubble" aria-hidden="true" />
-            <strong className="app-availability">App available</strong>
+            <strong className="app-availability" aria-live="polite">
+              <span className={`sync-dot ${isSyncLive ? "live" : "disconnected"}`} aria-hidden="true" />
+              {syncLabel}
+            </strong>
           </div>
         </div>
 

@@ -19,7 +19,7 @@ def healthz() -> dict:
 
 
 @router.get("/readyz")
-def readyz(request: Request) -> dict | Response:
+def readyz(request: Request) -> Response:
     def _op(session):
         session.execute(text("SELECT 1"))
 
@@ -34,7 +34,7 @@ def readyz(request: Request) -> dict | Response:
             status_code=503,
             content={"status": "degraded", "model": "unavailable"},
         )
-    return {"status": "ready"}
+    return JSONResponse(content={"status": "ready"})
 
 
 @router.get("/metrics")

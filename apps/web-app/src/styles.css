@@ -297,6 +297,26 @@ html[data-theme="dark"] .hypnogram circle[role="button"]:focus-visible {
 .app-availability {
   color: var(--text);
   font-size: 0.77rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.sync-dot.live {
+  background: var(--good);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--good) 24%, transparent);
+}
+
+.sync-dot.disconnected {
+  background: var(--danger);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--danger) 20%, transparent);
 }
 
 .tabs-shell {

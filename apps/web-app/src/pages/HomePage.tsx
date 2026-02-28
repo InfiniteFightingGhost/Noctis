@@ -5,10 +5,12 @@ import { MetricCard } from "../components/common/MetricCard";
 import { PageState } from "../components/common/PageState";
 import { Hypnogram } from "../components/visualizations/Hypnogram";
 import { useAsyncResource } from "../hooks/useAsyncResource";
+import { useSyncEvents } from "../hooks/useSyncEvents";
 
 export default function HomePage() {
   const loadHome = useCallback(() => apiClient.getHome(), []);
   const { loading, error, data } = useAsyncResource(loadHome);
+  const syncEvents = useSyncEvents();
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState("");
 
@@ -64,6 +66,18 @@ export default function HomePage() {
     window.URL.revokeObjectURL(objectUrl);
     setDownloadStatus("Mount report downloaded.");
   };
+
+  const syncStatusLabel = (() => {
+    if (syncEvents.snapshot?.last_ingest_at) {
+      return `Live sync: ${new Date(syncEvents.snapshot.last_ingest_at).toLocaleTimeString()}`;
+    }
+
+    if (syncEvents.connected && syncEvents.snapshot?.status === "idle") {
+      return "Live sync connected, no data yet.";
+    }
+
+    return `Last sync snapshot: ${data.date}`;
+  })();
 
   return (
     <section className="page-grid home-page">
@@ -160,7 +174,7 @@ export default function HomePage() {
           <article className="wearable-card glass-card">
             <div className="wearable-floating">
               <span className="wearable-avatar" aria-hidden="true" />
-              <p>{`Last sync snapshot: ${data.date}`}</p>
+              <p>{syncStatusLabel}</p>
             </div>
             <h2>Mounted device sync</h2>
             <p>Mountable sensor consistency this week.</p>

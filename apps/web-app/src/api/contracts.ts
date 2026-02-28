@@ -24,7 +24,7 @@ const trendNightSchema = z.object({
 const settingsProfileSchema = z.object({
   profile: z.object({
     id: z.string(),
-    username: z.string(),
+    username: z.string().min(1),
     email: z.string(),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -189,6 +189,32 @@ export const backendSleepSummarySchema = z.object({
     avgRrBrpm: z.number(),
     movementPct: z.number(),
   }),
+  stages: z
+    .object({
+      bins: z
+        .array(
+          z.object({
+            startMinFromBedtime: z.number(),
+            durationMin: z.number(),
+            stage: z.string(),
+          }),
+        )
+        .optional(),
+      pct: z
+        .object({
+          awake: z.number(),
+          light: z.number(),
+          deep: z.number(),
+          rem: z.number(),
+        })
+        .optional(),
+    })
+    .optional(),
+  insight: z
+    .object({
+      text: z.string(),
+    })
+    .optional(),
 });
 
 export const dataExportResponseSchema = z.object({
@@ -200,7 +226,7 @@ export const dataExportResponseSchema = z.object({
 
 export const backendAuthMeResponseSchema = z.object({
   id: z.string(),
-  username: z.string(),
+  username: z.string().min(1).optional(),
   email: z.string(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -223,7 +249,7 @@ export const authResponseSchema = z.object({
   expires_in: z.number(),
   user: z.object({
     id: z.string(),
-    username: z.string(),
+    username: z.string().min(1).optional(),
     email: z.string(),
     created_at: z.string(),
     updated_at: z.string(),
@@ -247,3 +273,4 @@ export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type SignupRequest = z.infer<typeof signupRequestSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type Stage = z.infer<typeof stageSchema>;
+export type BackendSleepSummary = z.infer<typeof backendSleepSummarySchema>;

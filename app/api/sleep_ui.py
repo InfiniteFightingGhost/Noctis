@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from datetime import timezone
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy import desc
 
 from app.auth.context import AuthContext
 from app.auth.dependencies import get_auth_context, require_scopes
-from app.db.models import Device, Prediction, Recording
+from app.db.models import Device, DeviceEpochRaw, Prediction, Recording
 from app.db.session import run_with_db_retry
 from app.schemas.sleep_ui import (
     HomeOverviewResponse,
@@ -138,9 +143,66 @@ def get_latest_sleep_summary(
 )
 def get_sync_status(
     tenant: TenantContext = Depends(get_tenant_context),
+    auth: AuthContext = Depends(get_auth_context),
 ) -> SyncStatusResponse:
-    _ = tenant
-    return SyncStatusResponse(status="ok")
+    user_id = None
+    if auth.principal_type == "user":
+        user_id = run_with_db_retry(
+            lambda session: _get_user_id_for_auth(session, tenant_id=tenant.id, auth=auth),
+            operation_name="sync_status_user_scope",
+        )
+
+    snapshot = run_with_db_retry(
+        lambda session: _build_sync_snapshot(session, tenant_id=tenant.id, user_id=user_id),
+        operation_name="sync_status_snapshot",
+    )
+    return SyncStatusResponse(status=snapshot["status"])
+
+
+@router.get(
+    "/sync/events",
+    dependencies=[Depends(require_scopes("read"))],
+)
+async def stream_sync_events(
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant_context),
+    auth: AuthContext = Depends(get_auth_context),
+) -> StreamingResponse:
+    user_id = None
+    if auth.principal_type == "user":
+        user_id = run_with_db_retry(
+            lambda session: _get_user_id_for_auth(session, tenant_id=tenant.id, auth=auth),
+            operation_name="sync_events_user_scope",
+        )
+
+    async def _event_stream():
+        last_payload: str | None = None
+        while True:
+            if await request.is_disconnected():
+                break
+
+            snapshot = run_with_db_retry(
+                lambda session: _build_sync_snapshot(session, tenant_id=tenant.id, user_id=user_id),
+                operation_name="sync_events_snapshot",
+            )
+            payload = json.dumps(snapshot, separators=(",", ":"))
+            if payload != last_payload:
+                yield f"event: sync\ndata: {payload}\n\n"
+                last_payload = payload
+            else:
+                yield "event: ping\ndata: {}\n\n"
+
+            await asyncio.sleep(3)
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get(
@@ -198,3 +260,38 @@ def _stage_to_ui(stage: str) -> str:
 def _get_user_id_for_auth(session, *, tenant_id, auth: AuthContext):
     user = get_domain_user_for_auth(session, tenant_id=tenant_id, auth=auth)
     return user.id if user else None
+
+
+def _build_sync_snapshot(session, *, tenant_id, user_id) -> dict[str, Any]:
+    device_raw_query = (
+        session.query(DeviceEpochRaw.received_at)
+        .filter(DeviceEpochRaw.tenant_id == tenant_id)
+        .order_by(desc(DeviceEpochRaw.received_at))
+    )
+    prediction_query = (
+        session.query(Prediction.window_end_ts)
+        .filter(Prediction.tenant_id == tenant_id)
+        .order_by(desc(Prediction.window_end_ts))
+    )
+
+    if user_id is not None:
+        device_raw_query = device_raw_query.join(
+            Device, Device.id == DeviceEpochRaw.device_id
+        ).filter(Device.user_id == user_id)
+        prediction_query = (
+            prediction_query.join(Recording, Recording.id == Prediction.recording_id)
+            .join(Device, Device.id == Recording.device_id)
+            .filter(Device.user_id == user_id)
+        )
+
+    latest_ingest = device_raw_query.first()
+    latest_prediction = prediction_query.first()
+    latest_ingest_at = latest_ingest[0] if latest_ingest else None
+    latest_prediction_at = latest_prediction[0] if latest_prediction else None
+
+    status = "ok" if latest_ingest_at is not None else "idle"
+    return {
+        "status": status,
+        "last_ingest_at": latest_ingest_at.isoformat() if latest_ingest_at else None,
+        "last_prediction_at": latest_prediction_at.isoformat() if latest_prediction_at else None,
+    }
