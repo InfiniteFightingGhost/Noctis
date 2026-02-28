@@ -1,3 +1,36 @@
+# ============================================================
+# Noctis — Railway deployment configuration
+#
+# This repo deploys as THREE Railway services. Create each one
+# in the Railway UI pointing at this same GitHub repo, then set
+# the "Config file path" for each service accordingly:
+#
+#   Service         | Config file path
+#   ----------------|-------------------------------
+#   noctis-api      | railway.toml          (this file)
+#   noctis-web      | railway.web.toml
+#
+# Required env vars (set in Railway UI per service):
+#
+#   noctis-api:
+#     DATABASE_URL          — injected automatically by Railway Postgres plugin
+#     AUTH_JWT_SECRET       — random secret string for user JWT signing
+#     JWT_SECRET            — random secret string for service JWT signing
+#     API_KEY               — API key for device/service auth
+#     ADMIN_KEY             — Admin API key
+#
+#   noctis-web:
+#     VITE_API_BASE_URL     — public URL of the noctis-api service
+#                             e.g. https://noctis-api.up.railway.app
+# ============================================================
+
+# --- API service ---
+# Built from docker/Dockerfile. The entrypoint.sh already:
+#   1. Waits for the database to be reachable
+#   2. Runs `alembic upgrade head` (migrations)
+#   3. Starts gunicorn
+# So no separate migration step is needed.
+
 [build]
 builder = "dockerfile"
 dockerfilePath = "docker/Dockerfile"
