@@ -4,7 +4,7 @@ dockerfilePath = "docker/Dockerfile"
 
 [deploy]
 startCommand = "gunicorn -c docker/gunicorn.conf.py app.main:app"
-healthcheckPath = "/readyz"
-healthcheckTimeout = 30
+healthcheckPath = "/healthz"
+healthcheckTimeout = 60
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

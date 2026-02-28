@@ -68,27 +68,53 @@ from app.utils.errors import AppError, ModelUnavailableError, RequestTimeoutErro
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    def _validate_db(session):
-        session.execute(text("SELECT 1"))
-
-    run_with_db_retry(_validate_db, operation_name="startup_validation")
+    log = logging.getLogger("app.startup")
     settings = get_settings()
 
-    def _bootstrap_schema(session):
-        ensure_active_schema_from_path(
-            session,
-            schema_path=settings.model_registry_path
-            / settings.active_model_version
-            / "feature_schema.json",
-            activate=True,
-        )
+    # Wait for DB with generous retries — on Railway the managed DB can take
+    # longer to accept connections than the default 3-attempt policy allows.
+    db_ready = False
+    for attempt in range(1, 31):
+        try:
 
-    run_with_db_retry(
-        _bootstrap_schema,
-        commit=True,
-        operation_name="feature_schema_bootstrap",
-    )
-    app.state.model_registry.load_active()
+            def _validate_db(session):
+                session.execute(text("SELECT 1"))
+
+            run_with_db_retry(_validate_db, operation_name="startup_validation")
+            db_ready = True
+            break
+        except Exception as exc:
+            log.warning("startup_db_not_ready attempt=%d error=%s", attempt, exc)
+            await anyio.sleep(min(2.0 * attempt, 10.0))
+
+    if not db_ready:
+        log.error("startup_db_unavailable: continuing without schema bootstrap")
+    else:
+        try:
+
+            def _bootstrap_schema(session):
+                ensure_active_schema_from_path(
+                    session,
+                    schema_path=settings.model_registry_path
+                    / settings.active_model_version
+                    / "feature_schema.json",
+                    activate=True,
+                )
+
+            run_with_db_retry(
+                _bootstrap_schema,
+                commit=True,
+                operation_name="feature_schema_bootstrap",
+            )
+        except Exception as exc:
+            log.error("startup_schema_bootstrap_failed error=%s", exc)
+
+    # Model load failure is non-fatal — get_loaded() will retry on first request.
+    try:
+        app.state.model_registry.load_active()
+    except Exception as exc:
+        log.error("startup_model_load_failed error=%s", exc)
+
     yield
 
 
