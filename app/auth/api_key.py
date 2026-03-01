@@ -40,9 +40,9 @@ def authenticate_hardware_api_key(request: Request) -> AuthContext | None:
     return AuthContext(
         client_id=uuid.uuid5(uuid.NAMESPACE_URL, f"hardware-api-key:{tenant_id}"),
         client_name="hardware-api-key",
-        role="admin",  # Escalating to admin to ensure read/ingest across recordings
+        role="ingest",
         tenant_id=tenant_id,
-        scopes={"ingest", "read", "admin"},
+        scopes={"ingest", "read"},
         key_id="hardware-api-key",
         principal_type="service",
     )
