@@ -110,8 +110,8 @@ def ingest_device_epoch_batch(
     payload: DeviceEpochIngestBatch,
     tenant: TenantContext = Depends(get_tenant_context),
     auth: AuthContext = Depends(get_auth_context),
-    background_tasks: BackgroundTasks = None,
-    request: Request | None = None,
+    background_tasks: BackgroundTasks = None,  # type: ignore[assignment]
+    request: Request = None,  # type: ignore[assignment]
 ) -> dict:
     INGEST_REQUESTS.inc()
 
