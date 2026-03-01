@@ -4,6 +4,7 @@ type PollingState<T> = {
   data: T | null;
   loading: boolean;
   error: string | null;
+  lastUpdatedAt: number | null;
 };
 
 export function usePolling<T>(fetcher: () => Promise<T>, intervalMs: number, enabled: boolean): PollingState<T> {
@@ -11,6 +12,7 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs: number, ena
     data: null,
     loading: false,
     error: null,
+    lastUpdatedAt: null,
   });
 
   useEffect(() => {
@@ -37,14 +39,14 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs: number, ena
           return;
         }
 
-        setState({ data, loading: false, error: null });
+        setState({ data, loading: false, error: null, lastUpdatedAt: Date.now() });
       } catch (error) {
         if (!active) {
           return;
         }
 
         const message = error instanceof Error ? error.message : "Unable to refresh data.";
-        setState((current) => ({ ...current, loading: false, error: message }));
+        setState((current) => ({ ...current, loading: false, error: message, lastUpdatedAt: current.lastUpdatedAt }));
       } finally {
         firstRun = false;
       }

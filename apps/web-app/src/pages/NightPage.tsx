@@ -67,7 +67,9 @@ export default function NightPage() {
   const [activeTab, setActiveTab] = useState<LiveTab>("epochs");
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [showNewDataBadge, setShowNewDataBadge] = useState(false);
   const lastPredictionRef = useRef<string | null>(null);
+  const prevDataCountRef = useRef<number>(0);
   const loadNight = useCallback(() => apiClient.getNight(), [refreshToken]);
   const { loading, error, data } = useAsyncResource(loadNight);
 
@@ -117,6 +119,18 @@ export default function NightPage() {
   const predictionsPolling = usePolling(loadPredictions, POLL_INTERVAL_MS, Boolean(recordingId) && activeTab === "predictions");
 
   useEffect(() => {
+    const currentData = activeTab === "epochs" ? epochsPolling.data : predictionsPolling.data;
+    const currentCount = currentData?.length ?? 0;
+
+    if (currentCount > prevDataCountRef.current && prevDataCountRef.current > 0) {
+      setShowNewDataBadge(true);
+      const timer = window.setTimeout(() => setShowNewDataBadge(false), 3000);
+      return () => window.clearTimeout(timer);
+    }
+    prevDataCountRef.current = currentCount;
+  }, [epochsPolling.data, predictionsPolling.data, activeTab]);
+
+  useEffect(() => {
     const lastPrediction = syncEvents.snapshot?.last_prediction_at ?? null;
     if (lastPrediction && lastPrediction !== lastPredictionRef.current) {
       lastPredictionRef.current = lastPrediction;
@@ -144,6 +158,7 @@ export default function NightPage() {
   const liveLoading = activeTab === "epochs" ? epochsPolling.loading : predictionsPolling.loading;
   const liveError = activeTab === "epochs" ? epochsPolling.error : predictionsPolling.error;
   const liveCount = activeTab === "epochs" ? (epochsPolling.data?.length ?? 0) : (predictionsPolling.data?.length ?? 0);
+  const lastUpdated = activeTab === "epochs" ? epochsPolling.lastUpdatedAt : predictionsPolling.lastUpdatedAt;
 
   return (
     <section className="page-grid night-page">
@@ -178,7 +193,10 @@ export default function NightPage() {
               role="tab"
               className={`pill ${activeTab === "epochs" ? "is-selected" : ""}`}
               aria-selected={activeTab === "epochs"}
-              onClick={() => setActiveTab("epochs")}
+              onClick={() => {
+                setActiveTab("epochs");
+                prevDataCountRef.current = epochsPolling.data?.length ?? 0;
+              }}
             >
               Epochs
             </button>
@@ -187,15 +205,26 @@ export default function NightPage() {
               role="tab"
               className={`pill ${activeTab === "predictions" ? "is-selected" : ""}`}
               aria-selected={activeTab === "predictions"}
-              onClick={() => setActiveTab("predictions")}
+              onClick={() => {
+                setActiveTab("predictions");
+                prevDataCountRef.current = predictionsPolling.data?.length ?? 0;
+              }}
             >
               Predictions
             </button>
+            {showNewDataBadge && <span className="new-data-badge">New Data</span>}
           </div>
 
-          <p className="night-live-meta">
-            {recordingId ? `Recording ${recordingId} · ${liveCount} row${liveCount === 1 ? "" : "s"}` : "Waiting for recording id"}
-          </p>
+          <div className="night-live-meta">
+            <span>
+              {recordingId ? `Recording ${recordingId} · ${liveCount} row${liveCount === 1 ? "" : "s"}` : "Waiting for recording id"}
+            </span>
+            {lastUpdated && (
+              <span className="last-updated">
+                Last updated: {new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            )}
+          </div>
         </div>
 
         {!recordingId ? (
