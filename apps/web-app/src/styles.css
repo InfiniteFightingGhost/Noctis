@@ -953,6 +953,48 @@ button:focus-visible {
   background: color-mix(in srgb, var(--surface-alt) 70%, transparent);
 }
 
+.night-live-header {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.7rem;
+}
+
+.night-live-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.night-live-table-wrap {
+  overflow-x: auto;
+}
+
+.night-live-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 520px;
+}
+
+.night-live-table th,
+.night-live-table td {
+  text-align: left;
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  font-size: 0.9rem;
+}
+
+.night-live-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.night-live-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.night-live-table td {
+  font-variant-numeric: tabular-nums;
+}
+
 .transition-matrix {
   display: grid;
   gap: 0.45rem;

@@ -256,6 +256,29 @@ export const authResponseSchema = z.object({
   }),
 });
 
+export const backendEpochResponseSchema = z.object({
+  recording_id: z.string(),
+  epoch_index: z.number().int().min(0),
+  epoch_start_ts: z.string(),
+  feature_schema_version: z.string(),
+  features_payload: z.record(z.unknown()),
+});
+
+export const backendPredictionResponseSchema = z.object({
+  id: z.string(),
+  recording_id: z.string(),
+  window_start_ts: z.string(),
+  window_end_ts: z.string(),
+  model_version: z.string(),
+  feature_schema_version: z.string(),
+  dataset_snapshot_id: z.string().nullable(),
+  predicted_stage: z.string(),
+  ground_truth_stage: z.string().nullable(),
+  confidence: z.number(),
+  probabilities: z.record(z.number()),
+  created_at: z.string(),
+});
+
 export type HomeResponse = z.infer<typeof homeSchema>;
 export type TrendsResponse = z.infer<typeof trendsSchema>;
 export type TrendsFilter = z.infer<typeof trendsFilterSchema>;
@@ -274,3 +297,5 @@ export type SignupRequest = z.infer<typeof signupRequestSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type Stage = z.infer<typeof stageSchema>;
 export type BackendSleepSummary = z.infer<typeof backendSleepSummarySchema>;
+export type BackendEpochResponse = z.infer<typeof backendEpochResponseSchema>;
+export type BackendPredictionResponse = z.infer<typeof backendPredictionResponseSchema>;

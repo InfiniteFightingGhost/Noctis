@@ -1,6 +1,8 @@
 import {
   actionResponseSchema,
   authResponseSchema,
+  backendEpochResponseSchema,
+  backendPredictionResponseSchema,
   backendDevicePairingStartResponseSchema,
   backendSleepSummarySchema,
   connectDeviceRequestSchema,
@@ -16,6 +18,9 @@ import {
   trendsSchema,
   type ActionResponse,
   type AuthResponse,
+  type BackendEpochResponse,
+  type BackendPredictionResponse,
+  type BackendSleepSummary,
   type ConnectDeviceRequest,
   type DataExportResponse,
   type DevicePairingStartRequest,
@@ -199,6 +204,71 @@ const mockSettingsDevicePayload: SettingsDeviceResponse = {
 
 const knownDeviceExternalIds = new Set(["noctis-halo-s1-001"]);
 
+const mockLatestSummary: BackendSleepSummary = backendSleepSummarySchema.parse({
+  recordingId: "recording-001",
+  dateLocal: "2026-02-26",
+  score: 84,
+  totals: {
+    totalSleepMin: 418,
+    timeInBedMin: 455,
+    sleepEfficiencyPct: 92,
+  },
+  metrics: {
+    deepPct: 19,
+    avgHrBpm: 58,
+    avgRrBrpm: 14,
+    movementPct: 12,
+  },
+});
+
+function buildMockEpochRows(recordingId: string): BackendEpochResponse[] {
+  const start = Date.parse(`${mockNightPayload.date}T22:00:00Z`);
+  return mockNightPayload.epochs.map((epoch) =>
+    backendEpochResponseSchema.parse({
+      recording_id: recordingId,
+      epoch_index: epoch.epochIndex,
+      epoch_start_ts: new Date(start + epoch.epochIndex * 30_000).toISOString(),
+      feature_schema_version: "v1",
+      features_payload: {},
+    }),
+  );
+}
+
+function mapDisplayStageToBackend(stage: string): string {
+  if (stage === "wake") {
+    return "W";
+  }
+  if (stage === "deep") {
+    return "N3";
+  }
+  if (stage === "rem") {
+    return "R";
+  }
+  return "N2";
+}
+
+function buildMockPredictionRows(recordingId: string): BackendPredictionResponse[] {
+  const start = Date.parse(`${mockNightPayload.date}T22:00:00Z`);
+  return mockNightPayload.epochs.map((epoch) => {
+    const windowStart = new Date(start + epoch.epochIndex * 30_000).toISOString();
+    const windowEnd = new Date(start + (epoch.epochIndex + 1) * 30_000).toISOString();
+    return backendPredictionResponseSchema.parse({
+      id: `pred-${epoch.epochIndex}`,
+      recording_id: recordingId,
+      window_start_ts: windowStart,
+      window_end_ts: windowEnd,
+      model_version: "mock-1",
+      feature_schema_version: "v1",
+      dataset_snapshot_id: null,
+      predicted_stage: mapDisplayStageToBackend(epoch.stage),
+      ground_truth_stage: null,
+      confidence: epoch.confidence,
+      probabilities: epoch.probabilities,
+      created_at: windowEnd,
+    });
+  });
+}
+
 const okAction: ActionResponse = {
   success: true,
   message: "Operation completed",
@@ -250,6 +320,10 @@ export const apiClient = {
   getTrends: (filter: TrendsFilter = "30D") => fetchEndpoint<TrendsResponse>("E-002", filter),
   getNightsList: () => fetchEndpoint<NightsListResponse>("E-003"),
   getNight: () => fetchEndpoint<NightResponse>("E-004"),
+  getLatestSleepSummary: async () => mockLatestSummary,
+  getRecordingEpochs: async (recordingId: string, _fromIso: string, _toIso: string) => buildMockEpochRows(recordingId),
+  getRecordingPredictions: async (recordingId: string, _fromIso: string, _toIso: string) =>
+    buildMockPredictionRows(recordingId),
   getSettingsProfile: () => fetchEndpoint<SettingsProfileResponse>("E-006"),
   getSettingsDevice: () => fetchEndpoint<SettingsDeviceResponse>("E-007"),
   getSettings: async (): Promise<SettingsResponse> => {
@@ -272,22 +346,7 @@ export const apiClient = {
     });
   },
   requestDataExport: async (): Promise<DataExportResponse> => {
-    const report = backendSleepSummarySchema.parse({
-      recordingId: "recording-001",
-      dateLocal: "2026-02-26",
-      score: 84,
-      totals: {
-        totalSleepMin: 418,
-        timeInBedMin: 455,
-        sleepEfficiencyPct: 92,
-      },
-      metrics: {
-        deepPct: 19,
-        avgHrBpm: 58,
-        avgRrBrpm: 14,
-        movementPct: 12,
-      },
-    });
+    const report = mockLatestSummary;
 
     return dataExportResponseSchema.parse({
       ...okAction,

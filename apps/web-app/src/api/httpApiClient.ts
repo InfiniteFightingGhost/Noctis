@@ -4,6 +4,8 @@ import {
   authResponseSchema,
   backendAuthMeResponseSchema,
   backendDeviceResponseSchema,
+  backendEpochResponseSchema,
+  backendPredictionResponseSchema,
   backendDevicePairingStartResponseSchema,
   backendSleepSummarySchema,
   connectDeviceRequestSchema,
@@ -21,6 +23,8 @@ import {
   type ActionResponse,
   type AuthResponse,
   type BackendDeviceResponse,
+  type BackendEpochResponse,
+  type BackendPredictionResponse,
   type BackendSleepSummary,
   type ConnectDeviceRequest,
   type DataExportResponse,
@@ -467,6 +471,24 @@ async function sendRequest<T>(config: RequestConfig<T>): Promise<T> {
 }
 
 export const httpApiClient = {
+  getLatestSleepSummary: () =>
+    sendRequest<BackendSleepSummary>({
+      method: "GET",
+      path: "/sleep/latest/summary",
+      schema: backendSleepSummarySchema,
+    }),
+  getRecordingEpochs: (recordingId: string, fromIso: string, toIso: string) =>
+    sendRequest<BackendEpochResponse[]>({
+      method: "GET",
+      path: `/recordings/${encodeURIComponent(recordingId)}/epochs?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`,
+      schema: z.array(backendEpochResponseSchema),
+    }),
+  getRecordingPredictions: (recordingId: string, fromIso: string, toIso: string) =>
+    sendRequest<BackendPredictionResponse[]>({
+      method: "GET",
+      path: `/recordings/${encodeURIComponent(recordingId)}/predictions?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`,
+      schema: z.array(backendPredictionResponseSchema),
+    }),
   getHome: async () => {
     try {
       const summary = await sendRequest({
