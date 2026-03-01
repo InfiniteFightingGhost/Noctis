@@ -1,0 +1,55 @@
+{
+  "status": "FAIL",
+  "hard_failures": [
+    {
+      "reason_code": "HARD_GLOBAL_MACRO_F1",
+      "value": 0.29308785690258093,
+      "threshold": 0.75,
+      "operator": "gte"
+    },
+    {
+      "reason_code": "HARD_GLOBAL_MCC",
+      "value": 0.09564979791898869,
+      "threshold": 0.7,
+      "operator": "gte"
+    },
+    {
+      "reason_code": "HARD_WORST_DECILE_MACRO_F1",
+      "value": 0.05772267654413973,
+      "threshold": 0.5,
+      "operator": "gte"
+    },
+    {
+      "reason_code": "HARD_REM_LATENCY_MAE",
+      "value": 89.72641509433963,
+      "threshold": 20.0,
+      "operator": "lte"
+    },
+    {
+      "reason_code": "HARD_REM_RECALL",
+      "value": 0.2803862401931201,
+      "threshold": 0.65,
+      "operator": "gte"
+    },
+    {
+      "reason_code": "HARD_DEEP_RECALL",
+      "value": 0.3714844081910103,
+      "threshold": 0.7,
+      "operator": "gte"
+    },
+    {
+      "reason_code": "HARD_WORST_NIGHT_MACRO_F1",
+      "value": 0.0831469184410361,
+      "threshold": 0.6,
+      "operator": "gte"
+    }
+  ],
+  "soft_warnings": [
+    {
+      "reason_code": "SOFT_WORST_DECILE_MACRO_F1",
+      "value": 0.05772267654413973,
+      "threshold": 0.45,
+      "operator": "gte"
+    }
+  ]
+}

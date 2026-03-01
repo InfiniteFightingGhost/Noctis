@@ -138,12 +138,6 @@ def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
     app.state.started_at = datetime.now(timezone.utc)
     app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_allow_origins,
-        allow_methods=settings.cors_allow_methods,
-        allow_headers=settings.cors_allow_headers,
-    )
-    app.add_middleware(
         JWTAuthMiddleware,
         exempt_paths={
             "/healthz",
@@ -158,6 +152,13 @@ def create_app() -> FastAPI:
             f"{settings.api_v1_prefix}/auth/me",
             f"{settings.api_v1_prefix}/auth/me/",
         },
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allow_origins,
+        allow_methods=settings.cors_allow_methods,
+        allow_headers=settings.cors_allow_headers,
+        allow_credentials=settings.cors_allow_credentials,
     )
 
     def _schema_provider():

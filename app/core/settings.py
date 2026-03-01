@@ -43,13 +43,14 @@ class Settings(BaseSettings):
     cors_allow_origins: list[str] = ["*"]
     cors_allow_methods: list[str] = ["*"]
     cors_allow_headers: list[str] = ["*"]
+    cors_allow_credentials: bool = False
 
     database_url: str = "postgresql+psycopg://postgres:postgres@timescaledb:5432/noctis"
     db_pool_size: int = 5
     db_max_overflow: int = 10
 
     model_registry_path: Path = Path("models")
-    active_model_version: str = "active"
+    active_model_version: str = "0.1.25"
     feature_schema_version: str = "v1"
     window_size: int = 21
     allow_window_padding: bool = False

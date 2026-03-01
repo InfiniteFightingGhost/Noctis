@@ -1,0 +1,66 @@
+dataset_dir: out/snapshots/pretrain_80_20
+output_root: models
+feature_schema_path: out/snapshots/pretrain_80_20/feature_schema.json
+
+model_type: cnn_bilstm
+random_seed: 42
+feature_strategy: sequence
+sequence_length: 11
+class_balance: none
+allow_predicted_labels: false
+
+split_strategy: recording
+split_seed: 42
+split_grouping_key: recording_id
+split_time_aware: false
+split_grouped_stratification: false
+split_stratify_key: dataset_rem_bucket
+evaluation_split_policy: val_or_test
+enforce_label_map_order: true
+
+version_bump: patch
+experiment_name: prod_multidomain_w11_wake_expert
+
+model:
+  use_dataset_conditioning: true
+  conditioning_mode: embedding
+  conditioning_embed_dim: 8
+  conv_channels: [64, 128, 128]
+  conv_kernel_size: 3
+  conv_dropout: 0.30
+  lstm_hidden_size: 192
+  lstm_layers: 2
+  lstm_dropout: 0.30
+  head_hidden_dims: [128, 64]
+  head_dropout: 0.30
+  use_residual_blocks: true
+  dilation_schedule: [1, 2, 4]
+
+training:
+  batch_size: 64
+  max_epochs: 72
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.001
+  loss_type: weighted_ce
+  class_weight_strategy: log_balanced
+  learning_rate: 0.0008
+  weight_decay: 0.0001
+  optimizer_beta1: 0.9
+  optimizer_beta2: 0.999
+  scheduler_type: plateau
+  scheduler_factor: 0.5
+  scheduler_patience: 2
+  scheduler_min_lr: 0.000001
+  gradient_clip_norm: 1.0
+  enable_domain_transfer_tests: true
+  enable_binary_pretraining: true
+  pretrain_epochs: 20
+  pretrain_task: wake_vs_sleep
+  pretrain_lr_scale: 1.0
+  pretrain_freeze_primary_head: false
+  pretrain_class_weight_strategy: balanced
+  pretrain_loss_type: focal
+  pretrain_focal_gamma: 1.5
+  normalization_policy: recording_zscore_then_global
+  hard_mining_enabled: false
+  focal_fallback_enabled: false

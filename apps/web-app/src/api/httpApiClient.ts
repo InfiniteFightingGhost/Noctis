@@ -369,7 +369,6 @@ async function attemptTokenRefresh(): Promise<boolean> {
     try {
       const response = await fetch(buildApiUrl(REFRESH_PATH), {
         method: "POST",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -412,7 +411,6 @@ async function sendRequest<T>(config: RequestConfig<T>): Promise<T> {
 
       const response = await fetch(buildApiUrl(config.path), {
         method: config.method,
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...(shouldAttachAuth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),

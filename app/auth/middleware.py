@@ -28,7 +28,8 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.method == "OPTIONS":
             return await call_next(request)
-        if request.url.path in self._exempt_paths:
+        normalized_path = request.url.path.rstrip("/") or "/"
+        if normalized_path in self._exempt_paths or request.url.path in self._exempt_paths:
             return await call_next(request)
         authorization = request.headers.get(get_settings().auth_header)
         if not authorization:

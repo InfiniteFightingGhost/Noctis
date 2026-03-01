@@ -160,29 +160,7 @@ Example token header + claim shape:
 - `docs/testing.md`
 - `docs/api-contract-map.md`
 
-## Autonomous Runner (OpenCode)
-Preflight before starting orchestration:
 ```
-command -v opencode && opencode --version
-```
-
-Policy rules:
-- `command -v opencode && opencode --version` MUST pass before any autonomous orchestration run.
-- Builder phases MUST execute sequentially in configured order (no parallel builder execution).
-
-Create project agents if needed:
-```
-opencode agent create
-```
-
-Run autonomous orchestration:
-```
-python tools/run_autonomous.py --config docs/runner-config.json
-```
-
-Notes:
-- Builder phases are executed sequentially by the default runner contract.
-- Runner outputs are attempt-qualified under `docs/run-log/outputs/` and do not overwrite retries.
 
 ## Architecture
 ```

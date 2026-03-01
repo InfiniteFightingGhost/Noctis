@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timezone
 from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 
 from app.auth.context import AuthContext
 from app.auth.dependencies import get_auth_context, require_scopes
@@ -24,6 +24,7 @@ from app.services.device_ingest import (
     store_device_epoch_raw,
 )
 from app.services.ingest import ingest_epochs
+from app.services.auto_predict import auto_predict_recording
 from app.services.user_identity import resolve_or_create_domain_user_for_auth
 from app.tenants.context import TenantContext, get_tenant_context
 
@@ -109,6 +110,8 @@ def ingest_device_epoch_batch(
     payload: DeviceEpochIngestBatch,
     tenant: TenantContext = Depends(get_tenant_context),
     auth: AuthContext = Depends(get_auth_context),
+    background_tasks: BackgroundTasks = None,
+    request: Request | None = None,
 ) -> dict:
     INGEST_REQUESTS.inc()
 
@@ -179,6 +182,14 @@ def ingest_device_epoch_batch(
         duration = time.perf_counter() - start
         if duration > 0 and payload.forward_to_ml:
             DEVICE_INGEST_RATE.set(inserted / duration)
+        if payload.forward_to_ml and request is not None and background_tasks is not None:
+            background_tasks.add_task(
+                auto_predict_recording,
+                tenant_id=tenant.id,
+                recording_id=recording.id,
+                registry=request.app.state.model_registry,
+            )
+
         logging.getLogger("app").info(
             "device_epochs_ingested",
             extra={

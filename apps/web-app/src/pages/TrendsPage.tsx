@@ -1,9 +1,10 @@
-import { Suspense, lazy, useCallback, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 import { apiClient } from "../api/apiClient";
 import { ChartContainer } from "../components/common/ChartContainer";
 import { MetricCard } from "../components/common/MetricCard";
 import { PageState } from "../components/common/PageState";
 import { useAsyncResource } from "../hooks/useAsyncResource";
+import { useSyncEvents } from "../hooks/useSyncEvents";
 
 const LineChart = lazy(() => import("../components/visualizations/LineChart").then((module) => ({ default: module.LineChart })));
 
@@ -11,8 +12,19 @@ const filters = ["7D", "30D", "90D", "Custom"] as const;
 
 export default function TrendsPage() {
   const [selectedFilter, setSelectedFilter] = useState<(typeof filters)[number]>("30D");
-  const loadTrends = useCallback(() => apiClient.getTrends(selectedFilter), [selectedFilter]);
+  const syncEvents = useSyncEvents();
+  const [refreshToken, setRefreshToken] = useState(0);
+  const lastPredictionRef = useRef<string | null>(null);
+  const loadTrends = useCallback(() => apiClient.getTrends(selectedFilter), [selectedFilter, refreshToken]);
   const { loading, error, data } = useAsyncResource(loadTrends);
+
+  useEffect(() => {
+    const lastPrediction = syncEvents.snapshot?.last_prediction_at ?? null;
+    if (lastPrediction && lastPrediction !== lastPredictionRef.current) {
+      lastPredictionRef.current = lastPrediction;
+      setRefreshToken((value) => value + 1);
+    }
+  }, [syncEvents.snapshot?.last_prediction_at]);
 
   if (loading) {
     return <PageState mode="loading" />;

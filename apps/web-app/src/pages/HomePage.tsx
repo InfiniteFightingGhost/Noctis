@@ -1,4 +1,4 @@
-import { useCallback, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { apiClient } from "../api/apiClient";
 import { ChartContainer } from "../components/common/ChartContainer";
 import { MetricCard } from "../components/common/MetricCard";
@@ -8,11 +8,21 @@ import { useAsyncResource } from "../hooks/useAsyncResource";
 import { useSyncEvents } from "../hooks/useSyncEvents";
 
 export default function HomePage() {
-  const loadHome = useCallback(() => apiClient.getHome(), []);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const lastPredictionRef = useRef<string | null>(null);
+  const loadHome = useCallback(() => apiClient.getHome(), [refreshToken]);
   const { loading, error, data } = useAsyncResource(loadHome);
   const syncEvents = useSyncEvents();
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState("");
+
+  useEffect(() => {
+    const lastPrediction = syncEvents.snapshot?.last_prediction_at ?? null;
+    if (lastPrediction && lastPrediction !== lastPredictionRef.current) {
+      lastPredictionRef.current = lastPrediction;
+      setRefreshToken((value) => value + 1);
+    }
+  }, [syncEvents.snapshot?.last_prediction_at]);
 
   if (loading) {
     return <PageState mode="loading" />;
