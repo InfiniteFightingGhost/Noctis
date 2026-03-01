@@ -31,11 +31,19 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         normalized_path = request.url.path.rstrip("/") or "/"
         if normalized_path in self._exempt_paths or request.url.path in self._exempt_paths:
             return await call_next(request)
-        authorization = request.headers.get(get_settings().auth_header)
-        if not authorization:
+
+        # 1. Try Hardware API Key first for specific paths (ingest/start)
+        # This ensures that hardware devices sending X-API-Key are not blocked by
+        # garbage Authorization headers (e.g. from proxies).
+        settings = get_settings()
+        if request.headers.get(settings.api_key_header):
             try:
                 api_key_auth = authenticate_hardware_api_key(request)
+                if api_key_auth is not None:
+                    request.state.auth = api_key_auth
+                    return await call_next(request)
             except AuthError as exc:
+                # If they provided an API key and it's INVALID, fail immediately
                 _log_auth_failure(exc.code, request)
                 response = JSONResponse(
                     status_code=exc.status_code,
@@ -48,9 +56,11 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                 )
                 _set_request_headers(response)
                 return response
-            if api_key_auth is not None:
-                request.state.auth = api_key_auth
-                return await call_next(request)
+
+        # 2. Try JWT Authorization
+        authorization = request.headers.get(settings.auth_header)
+        if not authorization:
+            # If no Authorization header and we didn't already succeed with API Key
             _log_auth_failure("missing_token", request)
             response = JSONResponse(
                 status_code=401,
@@ -63,6 +73,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             )
             _set_request_headers(response)
             return response
+
         if not authorization.startswith("Bearer "):
             _log_auth_failure("invalid_scheme", request)
             response = JSONResponse(

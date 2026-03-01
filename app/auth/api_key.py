@@ -12,8 +12,11 @@ from app.core.settings import get_settings
 
 def authenticate_hardware_api_key(request: Request) -> AuthContext | None:
     settings = get_settings()
-    ingest_path = f"{settings.api_v1_prefix}/epochs:ingest-device"
-    if request.url.path != ingest_path:
+    allowed_paths = {
+        f"{settings.api_v1_prefix}/epochs:ingest-device",
+        f"{settings.api_v1_prefix}/recordings:start",
+    }
+    if request.url.path not in allowed_paths:
         return None
     provided_key = request.headers.get(settings.api_key_header)
     if provided_key is None:
