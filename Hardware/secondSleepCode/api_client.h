@@ -5,12 +5,14 @@
 #include "types.h"
 
 void setupAPIClient();
+void setRecordingID(String id);
 void setAPIEndpoint(String endpoint);
 void setAPIKey(String key);
 String getAPIEndpoint();
 String getAPIKey();
 void pingAPI();
 
+String startNewRecording();
 bool uploadChunk(DataChunk* chunk, uint32_t chunkIndex);
 void uploadBacklog();
 

@@ -30,24 +30,58 @@ void setupAPIClient() {
 
   Serial.print("Device ID: ");
   Serial.println(device_id);
+}
 
-  // Generate a UUID for this recording session
-  char uuidStr[37];
-  uint8_t uuid[16];
-  for (int i = 0; i < 16; i++) {
-    uuid[i] = random(256);
+void setRecordingID(String id) {
+  recording_id_str = id;
+}
+
+String startNewRecording() {
+  if (!isWiFiConnected()) {
+    Serial.println("Cannot start recording, WiFi not connected.");
+    return "";
   }
-  // Set version to 4 (MSB of 7th byte is 0100)
-  uuid[6] = (uuid[6] & 0x0F) | 0x40;
-  // Set variant to RFC4122 (MSB of 9th byte is 10)
-  uuid[8] = (uuid[8] & 0x3F) | 0x80;
+
+  HTTPClient http;
+  String start_url = api_endpoint;
+  start_url.replace("epochs:ingest-device", "recordings:start");
   
-  sprintf(uuidStr, "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-          uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7],
-          uuid[8], uuid[9], uuid[10], uuid[11], uuid[12], uuid[13], uuid[14], uuid[15]);
-  recording_id_str = uuidStr;
-  Serial.print("Recording ID: ");
-  Serial.println(recording_id_str);
+  http.begin(start_url);
+  http.addHeader("Content-Type", "application/json");
+  if (api_key.length() > 0) {
+    http.addHeader("X-API-Key", api_key);
+  }
+
+  StaticJsonDocument<256> doc;
+  doc["device_external_id"] = device_id;
+  doc["timezone"] = "UTC";
+
+  String payload;
+  serializeJson(doc, payload);
+
+  Serial.print("Starting new recording session... ");
+  int httpCode = http.POST(payload);
+
+  String result_id = "";
+  if (httpCode == HTTP_CODE_OK) {
+    String response = http.getString();
+    StaticJsonDocument<512> respDoc;
+    DeserializationError error = deserializeJson(respDoc, response);
+    if (!error) {
+      result_id = respDoc["id"].as<String>();
+      recording_id_str = result_id;
+      Serial.println("OK");
+      Serial.print("New ID: "); Serial.println(result_id);
+    } else {
+      Serial.println("Failed to parse response.");
+    }
+  } else {
+    Serial.printf("Failed. HTTP %d\n", httpCode);
+    if (httpCode > 0) Serial.println(http.getString());
+  }
+
+  http.end();
+  return result_id;
 }
 
 void setAPIEndpoint(String endpoint) {

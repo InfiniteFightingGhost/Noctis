@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import desc
+from sqlalchemy import desc, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.db.models import Device, DeviceEpochRaw, Recording
 from app.feature_store.schema import FeatureSchemaRecord
 from app.feature_store.validation import validate_feature_payload
+
+
+RECORDING_TIMEOUT_HOURS = 12
 
 
 METRIC_ALIASES: dict[str, str] = {
@@ -61,6 +64,23 @@ def resolve_device(
     return device
 
 
+def close_open_recordings(
+    session: Session,
+    *,
+    tenant_id: Any,
+    device_id: Any,
+) -> int:
+    stmt = (
+        update(Recording)
+        .where(Recording.tenant_id == tenant_id)
+        .where(Recording.device_id == device_id)
+        .where(Recording.ended_at.is_(None))
+        .values(ended_at=datetime.now(timezone.utc))
+    )
+    result = session.execute(stmt)
+    return result.rowcount
+
+
 def resolve_recording(
     session: Session,
     *,
@@ -81,6 +101,8 @@ def resolve_recording(
         if not recording:
             raise ValueError("Recording not found")
         return recording
+
+    # Find latest open recording
     recording = (
         session.query(Recording)
         .filter(Recording.tenant_id == tenant_id)
@@ -89,8 +111,19 @@ def resolve_recording(
         .order_by(desc(Recording.started_at))
         .first()
     )
+
+    # Check for timeout (e.g. 12 hours)
+    if recording:
+        now = datetime.now(timezone.utc)
+        if recording.started_at < now - timedelta(hours=RECORDING_TIMEOUT_HOURS):
+            recording.ended_at = now
+            session.add(recording)
+            session.flush()
+            recording = None
+
     if recording:
         return recording
+
     started_at = started_at or datetime.now(timezone.utc)
     recording = Recording(
         tenant_id=tenant_id,

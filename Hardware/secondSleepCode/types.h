@@ -39,6 +39,16 @@ struct __attribute__((packed)) DataChunk {
 #define UPLOAD_BITMAP_SIZE 1024 // 1KB bitmap, covers 8192 chunks
 
 struct FlashMetadata {
+  uint32_t version;         // = 3 for this version
+  uint32_t writeAddr;
+  uint32_t totalChunks;
+  uint32_t uploadedChunks;
+  uint32_t magic;           // 0xDEADBEEF
+  char recording_id[37];    // UUID string
+  uint8_t upload_bitmap[UPLOAD_BITMAP_SIZE];
+};
+
+struct FlashMetadataV2 {
   uint32_t version;         // = 2 for this version
   uint32_t writeAddr;
   uint32_t totalChunks;

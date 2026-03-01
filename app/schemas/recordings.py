@@ -14,6 +14,12 @@ class RecordingCreate(BaseSchema):
     timezone: str | None = Field(default=None, max_length=64)
 
 
+class RecordingStartRequest(BaseSchema):
+    device_external_id: str = Field(..., max_length=200)
+    started_at: datetime | None = None
+    timezone: str | None = Field(default=None, max_length=64)
+
+
 class RecordingResponse(BaseSchema):
     id: uuid.UUID
     device_id: uuid.UUID

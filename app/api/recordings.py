@@ -10,8 +10,9 @@ from app.db.models import Device, Epoch, Prediction, Recording
 from app.db.session import run_with_db_retry
 from app.schemas.epochs import EpochResponse
 from app.schemas.predictions import PredictionResponse
-from app.schemas.recordings import RecordingCreate, RecordingResponse
+from app.schemas.recordings import RecordingCreate, RecordingResponse, RecordingStartRequest
 from app.schemas.summary import RecordingSummary
+from app.services.device_ingest import close_open_recordings, resolve_device, resolve_recording
 from app.services.summary import summarize_predictions
 from app.tenants.context import TenantContext, get_tenant_context
 
@@ -53,6 +54,40 @@ def create_recording(
         return recording
 
     recording = run_with_db_retry(_create, commit=True, operation_name="recording_create")
+    return RecordingResponse.model_validate(recording)
+
+
+@router.post(
+    "/recordings:start",
+    response_model=RecordingResponse,
+    dependencies=[Depends(require_scopes("ingest"))],
+)
+def start_recording(
+    payload: RecordingStartRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+) -> RecordingResponse:
+    def _op(session):
+        device = resolve_device(
+            session,
+            tenant_id=tenant.id,
+            device_id=None,
+            external_id=payload.device_external_id,
+            name=None,
+        )
+        # Rule 1: Close any existing open recordings for this device
+        close_open_recordings(session, tenant_id=tenant.id, device_id=device.id)
+
+        recording = resolve_recording(
+            session,
+            tenant_id=tenant.id,
+            device_id=device.id,
+            recording_id=None,
+            started_at=payload.started_at,
+            timezone_name=payload.timezone,
+        )
+        return recording
+
+    recording = run_with_db_retry(_op, commit=True, operation_name="recording_start")
     return RecordingResponse.model_validate(recording)
 
 
