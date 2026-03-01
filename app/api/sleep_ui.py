@@ -14,9 +14,14 @@ from app.auth.dependencies import get_auth_context, require_scopes
 from app.db.models import Device, DeviceEpochRaw, Prediction, Recording
 from app.db.session import run_with_db_retry
 from app.schemas.sleep_ui import (
+    DataQuality,
     HomeOverviewResponse,
     InsightFeedbackRequest,
+    PrimaryAction,
+    SleepInsight,
+    SleepMetrics,
     SleepSummaryResponse,
+    SleepTotals,
     SyncStatusResponse,
 )
 from app.services.summary import summarize_predictions
@@ -66,8 +71,43 @@ def get_latest_sleep_summary(
         )
 
     predictions = run_with_db_retry(_predictions, operation_name="sleep_ui_predictions")
+
     if not predictions:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No predictions found")
+        # Fallback for sessions that have epochs but no predictions yet (ML window delay)
+        return SleepSummaryResponse(
+            recordingId=str(recording.id),
+            dateLocal=recording.started_at.date().isoformat(),
+            bedtimeLocal=recording.started_at.isoformat(),
+            waketimeLocal=recording.started_at.isoformat(),
+            score=0,
+            scoreLabel="Waiting for data...",
+            totals=SleepTotals(
+                totalSleepMin=0,
+                timeInBedMin=0,
+                sleepEfficiencyPct=0,
+            ),
+            stages={
+                "bins": [],
+                "pct": {"awake": 0, "light": 0, "deep": 0, "rem": 0},
+            },
+            metrics=SleepMetrics(
+                deepPct=0,
+                avgHrBpm=0,
+                avgRrBrpm=0,
+                movementPct=0,
+            ),
+            insight=SleepInsight(
+                text="The ML model is waiting for enough data to begin analysis (requires ~10 minutes).",
+                tag="waiting",
+                confidence=0.0,
+            ),
+            primaryAction=PrimaryAction(label="Refresh Feed", action="refresh"),
+            dataQuality=DataQuality(
+                status="pending",
+                issues=["Insufficient data for ML inference"],
+                lastSyncAtLocal=recording.started_at.isoformat(),
+            ),
+        )
 
     first = predictions[0].window_start_ts.astimezone(timezone.utc)
     last = predictions[-1].window_end_ts.astimezone(timezone.utc)
@@ -100,11 +140,11 @@ def get_latest_sleep_summary(
         waketimeLocal=last.isoformat(),
         score=score,
         scoreLabel=score_label,
-        totals={
-            "totalSleepMin": total_minutes,
-            "timeInBedMin": total_minutes,
-            "sleepEfficiencyPct": max(0, 100 - pct["awake"]),
-        },
+        totals=SleepTotals(
+            totalSleepMin=total_minutes,
+            timeInBedMin=total_minutes,
+            sleepEfficiencyPct=max(0, 100 - pct["awake"]),
+        ),
         stages={
             "bins": [
                 {
@@ -116,23 +156,23 @@ def get_latest_sleep_summary(
             ],
             "pct": pct,
         },
-        metrics={
-            "deepPct": pct["deep"],
-            "avgHrBpm": 58,
-            "avgRrBrpm": 14,
-            "movementPct": 12,
-        },
-        insight={
-            "text": "Your deepest sleep came in the first half of the night.",
-            "tag": "pattern",
-            "confidence": 0.78,
-        },
-        primaryAction={"label": "Improve Tonight", "action": "open_improve"},
-        dataQuality={
-            "status": "ok",
-            "issues": [],
-            "lastSyncAtLocal": last.isoformat(),
-        },
+        metrics=SleepMetrics(
+            deepPct=pct["deep"],
+            avgHrBpm=58,
+            avgRrBrpm=14,
+            movementPct=12,
+        ),
+        insight=SleepInsight(
+            text="Your deepest sleep came in the first half of the night.",
+            tag="pattern",
+            confidence=0.78,
+        ),
+        primaryAction=PrimaryAction(label="Improve Tonight", action="open_improve"),
+        dataQuality=DataQuality(
+            status="ok",
+            issues=[],
+            lastSyncAtLocal=last.isoformat(),
+        ),
     )
 
 
