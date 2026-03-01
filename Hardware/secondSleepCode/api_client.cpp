@@ -4,31 +4,42 @@
 #include <ArduinoJson.h>
 #include "wifi_manager.h"
 #include "rgb_led.h"
+#include "RTClib.h"
 
-// External functions to be implemented in the main .ino file
+// External functions and globals from the main .ino file
 extern void update_upload_status(uint32_t chunkIndex, bool sent);
 extern bool get_upload_status(uint32_t chunkIndex);
 extern uint32_t get_total_chunks();
 extern bool read_chunk_from_flash(uint32_t chunkIndex, DataChunk* chunk);
 extern void set_system_error_state(const char* reason);
+extern FlashMetadata meta; 
+
+// External globals defined in the main .ino
+extern RTC_DS3231 rtc;
 
 
 Preferences preferences;
 String api_endpoint;
 String api_key;
 String device_id;
-String recording_id_str;
+String recording_id_str; // In-memory cache of the current recording ID
+
+// Helper to format unix time to ISO8601 string
+void toISO8601(uint32_t unix_time, char* buffer, size_t buffer_size) {
+    DateTime dt(unix_time);
+    snprintf(buffer, buffer_size, "%04d-%02d-%02dT%02d:%02d:%02dZ", 
+             dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second());
+}
 
 void setupAPIClient() {
   preferences.begin("noctis-api", false);
   api_endpoint = preferences.getString("endpoint", "https://backend-production-2e2e.up.railway.app/v1/epochs:ingest-device");
   api_key = preferences.getString("apikey", "");
   
-  // Per the new format, use a fixed device ID.
-  device_id = "noctis-halo-s1-001";
-  preferences.putString("device_id", device_id); // Save it in case other parts of the system use it.
+  device_id = preferences.getString("device_id", "noctis-halo-s1-001");
+  preferences.putString("device_id", device_id);
 
-  Serial.print("Device ID: ");
+  Serial.print("Device External ID: ");
   Serial.println(device_id);
 }
 
@@ -44,10 +55,12 @@ String startNewRecording() {
 
   HTTPClient http;
   String start_url = api_endpoint;
+  // Derive the start-recording URL from the ingest URL
   start_url.replace("epochs:ingest-device", "recordings:start");
   
   http.begin(start_url);
   http.addHeader("Content-Type", "application/json");
+  // This endpoint uses API Key authentication.
   if (api_key.length() > 0) {
     http.addHeader("X-API-Key", api_key);
   }
@@ -69,7 +82,7 @@ String startNewRecording() {
     DeserializationError error = deserializeJson(respDoc, response);
     if (!error) {
       result_id = respDoc["id"].as<String>();
-      recording_id_str = result_id;
+      setRecordingID(result_id);
       Serial.println("OK");
       Serial.print("New ID: "); Serial.println(result_id);
     } else {
@@ -83,6 +96,7 @@ String startNewRecording() {
   http.end();
   return result_id;
 }
+
 
 void setAPIEndpoint(String endpoint) {
   api_endpoint = endpoint;
@@ -125,106 +139,80 @@ void pingAPI() {
   http.end();
 }
 
-String serializeChunkToJSON(DataChunk* chunk) {
-  StaticJsonDocument<3072> doc; // Increased size for new fields
-
-  // Static fields
-  doc["device_external_id"] = device_id;
-  doc["device_name"] = "Noctis Halo V1";
-  doc["timezone"] = "UTC";
-  doc["forward_to_ml"] = true;
-
-  // Dynamic fields based on chunk
-  time_t recording_start_ts = chunk->header.timestamp;
-  char iso_start_ts[21];
-  strftime(iso_start_ts, sizeof(iso_start_ts), "%Y-%m-%dT%H:%M:%SZ", gmtime(&recording_start_ts));
-  
-  doc["recording_started_at"] = iso_start_ts;
-
-  doc["recording_id"] = recording_id_str;
-
-  JsonArray epochs = doc.createNestedArray("epochs");
-
-  for (int i = 0; i < chunk->header.num_epochs; i++) {
-    JsonObject epoch = epochs.createNestedObject();
-    
-    time_t epoch_ts = chunk->header.timestamp + (i * 30); // 30s per epoch
-    char iso_epoch_ts[21];
-    strftime(iso_epoch_ts, sizeof(iso_epoch_ts), "%Y-%m-%dT%H:%M:%SZ", gmtime(&epoch_ts));
-    
-    epoch["epoch_start_ts"] = iso_epoch_ts;
-    epoch["epoch_index"] = i;
-
-    JsonObject metrics = epoch.createNestedObject("metrics");
-    EpochQ15* ep = &chunk->epochs[i];
-    metrics["in_bed_pct"] = ep->in_bed_pct;
-    metrics["hr_mean"] = ep->hr_mean;
-    metrics["hr_std"] = ep->hr_std;
-    metrics["dhr"] = ep->dhr;
-    metrics["rr_mean"] = ep->rr_mean;
-    metrics["rr_std"] = ep->rr_std;
-    metrics["drr"] = ep->drr;
-    metrics["large_move_pct"] = ep->large_move_pct;
-    metrics["minor_move_pct"] = ep->minor_move_pct;
-    metrics["turnovers_delta"] = ep->turnovers_delta;
-    metrics["apnea_delta"] = ep->apnea_delta;
-    metrics["flags"] = ep->flags;
-    metrics["vib_move_pct"] = ep->vib_move_pct;
-    metrics["vib_resp_q"] = ep->vib_resp_q;
-    metrics["agree_flags"] = ep->agree_flags;
-  }
-
-  String output;
-  serializeJson(doc, output);
-  return output;
-}
-
-bool uploadChunk(DataChunk* chunk, uint32_t chunkIndex) {
-  if (!isWiFiConnected()) {
-    return false;
-  }
-
-  HTTPClient http;
-  http.begin(api_endpoint);
-  http.addHeader("Content-Type", "application/json");
-  if (api_key.length() > 0) {
-    http.addHeader("X-API-Key", api_key);
-  }
-  
-  String jsonPayload = serializeChunkToJSON(chunk);
-  
-  Serial.print("Uploading chunk #");
-  Serial.print(chunkIndex);
-  Serial.print("... ");
-
-  int httpCode = 0;
-  for (int i = 0; i < 3; i++) {
-    httpCode = http.POST(jsonPayload);
-    if (httpCode > 0) {
-      break; // Success
+bool uploadChunkAsEpochBatch(DataChunk* chunk, uint32_t chunkIndex) {
+    if (!isWiFiConnected()) {
+        Serial.println("Cannot upload: WiFi not connected.");
+        return false;
     }
-    if (i < 2) {
-      Serial.printf("Upload failed (%s), retrying in 2s...\n", http.errorToString(httpCode).c_str());
-      delay(2000);
-    }
-  }
 
-  if (httpCode > 0) {
-    Serial.printf("HTTP %d\n", httpCode);
+    DynamicJsonDocument doc(16384);
+
+    doc["device_external_id"] = device_id;
+    doc["device_name"] = "Sleep Monitor v4.0 WiFi";
+    doc["forward_to_ml"] = true;
+
+    char iso_buffer[21];
+    toISO8601(meta.recording_start_ts, iso_buffer, sizeof(iso_buffer));
+    doc["recording_started_at"] = iso_buffer;
+
+    JsonArray epochs = doc.createNestedArray("epochs");
+
+    for (int i = 0; i < chunk->header.num_epochs; i++) {
+        EpochQ15* ep = &chunk->epochs[i];
+        JsonObject epoch_obj = epochs.createNestedObject();
+
+        epoch_obj["epoch_index"] = chunkIndex * CHUNK_EPOCHS + i;
+
+        uint32_t epoch_unix_time = chunk->header.timestamp + (i * EPOCH_SECONDS);
+        toISO8601(epoch_unix_time, iso_buffer, sizeof(iso_buffer));
+        epoch_obj["epoch_start_ts"] = iso_buffer;
+
+        JsonArray metrics = epoch_obj.createNestedArray("metrics");
+        metrics.add(ep->in_bed_pct / 100.0f);
+        metrics.add((float)ep->hr_mean);
+        metrics.add((float)ep->hr_std);
+        metrics.add((float)ep->dhr);
+        metrics.add((float)ep->rr_mean);
+        metrics.add((float)ep->rr_std);
+        metrics.add((float)ep->drr);
+        metrics.add(ep->large_move_pct / 100.0f);
+        metrics.add(ep->minor_move_pct / 100.0f);
+        metrics.add((float)ep->turnovers_delta);
+        metrics.add((float)ep->apnea_delta);
+        metrics.add((float)ep->flags);
+        metrics.add(ep->vib_move_pct / 100.0f);
+        metrics.add(ep->vib_resp_q / 100.0f);
+        metrics.add(ep->agree_flags / 100.0f);
+    }
+    
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
+
+    HTTPClient http;
+    http.begin(api_endpoint);
+    http.addHeader("Content-Type", "application/json");
+    if (api_key.length() > 0) {
+        http.addHeader("X-API-Key", api_key);
+    }
+    
+    Serial.print("Uploading chunk #");
+    Serial.print(chunkIndex);
+    Serial.print(" as epoch batch... ");
+    
+    int httpCode = http.POST(jsonPayload);
+
     if (httpCode == HTTP_CODE_OK) {
-      update_upload_status(chunkIndex, true);
-      http.end();
-      return true;
+        Serial.printf("HTTP 200 OK\n");
+        http.end();
+        return true;
     } else {
-      String payload = http.getString();
-      Serial.println(payload);
+        Serial.printf("HTTP %d Error\n", httpCode);
+        String responseBody = http.getString();
+        Serial.println("Response body:");
+        Serial.println(responseBody);
+        http.end();
+        return false;
     }
-  } else {
-    Serial.printf("Upload failed, error: %s\n", http.errorToString(httpCode).c_str());
-  }
-
-  http.end();
-  return false;
 }
 
 uint32_t getBacklogCount() {
@@ -259,18 +247,18 @@ void uploadBacklog() {
         if (!get_upload_status(i)) {
             DataChunk chunk;
             if (read_chunk_from_flash(i, &chunk)) {
-                if (uploadChunk(&chunk, i)) {
+                if (uploadChunkAsEpochBatch(&chunk, i)) {
+                    update_upload_status(i, true);
                     successCount++;
                 } else {
-                    // Stop on first failure to avoid hammering a broken endpoint
                     Serial.println("Upload failed, pausing backlog.");
                     led_offline_mode();
                     return;
                 }
             } else {
-                Serial.print("Failed to read chunk #");
-                Serial.println(i);
-                set_system_error_state("Flash read failed");
+                char reason[50];
+                sprintf(reason, "Flash read failed for chunk %lu", i);
+                set_system_error_state(reason);
                 return;
             }
         }
@@ -287,6 +275,7 @@ void printAPIStatus() {
     Serial.print("API Endpoint:   "); Serial.println(api_endpoint);
     Serial.print("API Key Set:    "); Serial.println(api_key.length() > 0 ? "Yes" : "No");
     Serial.print("Device ID:      "); Serial.println(device_id);
+    Serial.print("Recording ID:   "); Serial.println(recording_id_str);
     Serial.print("Unsent Chunks:  "); Serial.println(getBacklogCount());
     Serial.println("------------------\n");
 }

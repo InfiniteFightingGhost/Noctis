@@ -53,7 +53,6 @@
 
 // --- CONFIGURATION ---
 #define MPU_ADDR              0x69
-#define EPOCH_SECONDS         30
 #define MAX_SAMPLES_PER_EPOCH 35
 #define WDT_TIMEOUT_S         30
 
@@ -162,7 +161,8 @@ void initializeNewMetadata() {
     meta.writeAddr = DATA_START_ADDR;
     meta.totalChunks = 0;
     meta.uploadedChunks = 0;
-    memset(meta.recording_id, 0, 37);
+    meta.recording_start_ts = rtc.now().unixtime();
+    memset(meta.recording_id, 0, sizeof(meta.recording_id));
     memset(meta.upload_bitmap, 0, UPLOAD_BITMAP_SIZE);
     flashWriteAddr = DATA_START_ADDR;
     saveMetadata();
@@ -178,25 +178,25 @@ void handleMetadataMigration() {
         setRecordingID(String(meta.recording_id));
         Serial.print("✓ Resuming v3 - chunks saved: "); Serial.println(meta.totalChunks);
         Serial.print("  Recording ID: "); Serial.println(meta.recording_id);
-        Serial.print("  Uploaded: "); Serial.print(meta.uploadedChunks);
-        Serial.print(" / Next write addr: "); Serial.println(flashWriteAddr);
     } else {
-        // Could be v1, v2 or garbage. 
-        if (meta.magic == 0xDEADBEEF && meta.version == 2) {
+        // Check for V2
+        FlashMetadataV2 meta_v2;
+        flash.readAnything(METADATA_ADDR, meta_v2);
+        if (meta_v2.magic == 0xDEADBEEF && meta_v2.version == 2) {
             Serial.println("!!! Old v2 metadata found. Upgrading to v3...");
-            FlashMetadataV2 meta_v2;
-            flash.readAnything(METADATA_ADDR, meta_v2);
             meta.version = 3;
             meta.magic = 0xDEADBEEF;
             meta.writeAddr = meta_v2.writeAddr;
             meta.totalChunks = meta_v2.totalChunks;
             meta.uploadedChunks = meta_v2.uploadedChunks;
-            memset(meta.recording_id, 0, 37);
+            meta.recording_start_ts = rtc.now().unixtime(); // Set new field to now
+            memset(meta.recording_id, 0, sizeof(meta.recording_id)); // Clear recording ID to force new one
             memcpy(meta.upload_bitmap, meta_v2.upload_bitmap, UPLOAD_BITMAP_SIZE);
             flashWriteAddr = meta.writeAddr;
             saveMetadata();
             Serial.println("✓ Metadata migrated to v3.");
         } else {
+            // Check for V1
             FlashMetadataV1 meta_v1;
             flash.readAnything(METADATA_ADDR, meta_v1);
             if (meta_v1.magic == 0xDEADBEEF) {
@@ -206,9 +206,10 @@ void handleMetadataMigration() {
                 meta.writeAddr = meta_v1.writeAddr;
                 meta.totalChunks = meta_v1.totalChunks;
                 meta.uploadedChunks = 0;
-                memset(meta.recording_id, 0, 37);
+                meta.recording_start_ts = rtc.now().unixtime(); // Set new field to now
+                memset(meta.recording_id, 0, sizeof(meta.recording_id)); // Clear recording ID
                 memset(meta.upload_bitmap, 0, UPLOAD_BITMAP_SIZE);
-                flashWriteAddr = meta_v1.writeAddr;
+                flashWriteAddr = meta.writeAddr;
                 saveMetadata();
                 Serial.println("✓ Metadata migrated to v3.");
             } else {
@@ -552,7 +553,9 @@ void saveChunkToFlash() {
       Serial.print("✓ CHUNK #"); Serial.print(meta.totalChunks); Serial.println(" SAVED");
 
       // Attempt real-time upload
-      uploadChunk(&currentChunk, savedChunkIndex);
+      if(uploadChunkAsEpochBatch(&currentChunk, savedChunkIndex)) {
+          update_upload_status(savedChunkIndex, true);
+      }
 
   } else {
     set_system_error_state("Flash write failed!");

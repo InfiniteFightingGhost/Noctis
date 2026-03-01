@@ -5,6 +5,7 @@
 
 // --- CONFIGURATION ---
 #define CHUNK_EPOCHS          20
+#define EPOCH_SECONDS         30
 
 // --- DATA STRUCTURES ---
 struct __attribute__((packed)) EpochQ15 {
@@ -44,6 +45,7 @@ struct FlashMetadata {
   uint32_t totalChunks;
   uint32_t uploadedChunks;
   uint32_t magic;           // 0xDEADBEEF
+  uint32_t recording_start_ts; // The unix timestamp of when the recording session started
   char recording_id[37];    // UUID string
   uint8_t upload_bitmap[UPLOAD_BITMAP_SIZE];
 };

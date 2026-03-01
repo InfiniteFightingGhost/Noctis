@@ -13,7 +13,7 @@ String getAPIKey();
 void pingAPI();
 
 String startNewRecording();
-bool uploadChunk(DataChunk* chunk, uint32_t chunkIndex);
+bool uploadChunkAsEpochBatch(DataChunk* chunk, uint32_t chunkIndex);
 void uploadBacklog();
 
 // For serial commands
