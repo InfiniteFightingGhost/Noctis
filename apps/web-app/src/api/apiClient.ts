@@ -2,13 +2,52 @@ import { httpApiClient } from "./httpApiClient";
 import { apiClient as mockApiClient } from "./mockApiClient";
 
 const hasApiBaseUrl = typeof import.meta.env.VITE_API_BASE_URL === "string" && import.meta.env.VITE_API_BASE_URL.length > 0;
-const useMockApi =
+const MOCK_EMAIL = "andrean1710taja1234@gmail.com";
+
+const getStorage = () => {
+  if (typeof window !== "undefined" && window.localStorage && typeof window.localStorage.getItem === "function") {
+    return window.localStorage;
+  }
+  return null;
+};
+
+const isMockSession = () => {
+  return getStorage()?.getItem("noctis_use_mock_api") === "true";
+};
+
+const baseUseMockApi =
   import.meta.env.VITE_USE_MOCK_API === "true" ||
   import.meta.env.MODE === "test";
 
-if (!useMockApi && !hasApiBaseUrl && import.meta.env.DEV) {
-  // eslint-disable-next-line no-console
-  console.warn("VITE_API_BASE_URL is not set. Using same-origin '/v1' endpoints (requires Vite proxy in dev).");
-}
+// Create a proxy to dynamically switch between HTTP and Mock clients
+export const apiClient = new Proxy(mockApiClient, {
+  get(_target, prop: keyof typeof mockApiClient) {
+    const useMock = baseUseMockApi || isMockSession();
+    const activeClient = useMock ? (mockApiClient as any) : (httpApiClient as any);
+    const value = activeClient[prop];
 
-export const apiClient = useMockApi ? mockApiClient : httpApiClient;
+    if (prop === "login") {
+      return async (payload: any) => {
+        if (payload && payload.email === MOCK_EMAIL) {
+          getStorage()?.setItem("noctis_use_mock_api", "true");
+          return mockApiClient.login(payload);
+        }
+        getStorage()?.removeItem("noctis_use_mock_api");
+        return httpApiClient.login(payload);
+      };
+    }
+
+    if (prop === "logout") {
+      return async () => {
+        getStorage()?.removeItem("noctis_use_mock_api");
+        return activeClient.logout();
+      };
+    }
+
+    if (typeof value === "function") {
+      return value.bind(activeClient);
+    }
+
+    return value;
+  },
+});
