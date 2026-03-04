@@ -36,8 +36,16 @@ import {
   type TrendsResponse,
 } from "./contracts";
 
+const getRelativeDate = (daysAgo: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return d.toISOString().split("T")[0];
+};
+
+const yesterday = getRelativeDate(1);
+
 const mockHomePayload: HomeResponse = {
-  date: "2026-02-26",
+  date: yesterday,
   metrics: {
     sleepScore: 84,
     totalSleepMinutes: 418,
@@ -88,31 +96,34 @@ const mockHomePayload: HomeResponse = {
     wasoMinutes: 31,
   },
   aiSummary:
-    "Sleep continuity and architecture are improved relative to baseline, with modest REM suppression early in the night and stable deep sleep capture across the final two cycles.",
+    "Your sleep last night was exceptionally restorative. Sleep architecture showed robust deep sleep cycles early on, followed by healthy REM clusters. Sleep efficiency was high at 92%, well above your 7-day baseline.",
 };
 
 const mockTrendsPayload: TrendsResponse = {
   activeFilter: "30D",
-  nights: Array.from({ length: 12 }).map((_, i) => ({
-    date: `2026-02-${String(i + 1).padStart(2, "0")}`,
-    sleepScore: 70 + i,
-    totalSleepMinutes: 360 + i * 7,
-    sleepEfficiency: 86 + i * 0.4,
-    remPercent: 20 + i * 0.2,
-    deepPercent: 16 + i * 0.15,
-    fragmentationIndex: 0.28 - i * 0.005,
-    hrMean: 63 - i * 0.2,
-    hrv: 38 + i * 0.9,
-    consistencyIndex: 73 + i * 0.8,
-  })),
+  nights: Array.from({ length: 30 }).map((_, i) => {
+    const date = getRelativeDate(30 - i);
+    return {
+      date,
+      sleepScore: 70 + (i % 20),
+      totalSleepMinutes: 360 + (i % 20) * 7,
+      sleepEfficiency: 86 + (i % 20) * 0.4,
+      remPercent: 20 + (i % 20) * 0.2,
+      deepPercent: 16 + (i % 20) * 0.15,
+      fragmentationIndex: 0.28 - (i % 20) * 0.005,
+      hrMean: 63 - (i % 20) * 0.2,
+      hrv: 38 + (i % 20) * 0.9,
+      consistencyIndex: 73 + (i % 20) * 0.8,
+    };
+  }),
   movingAverageWindow: 7,
   varianceBand: {
     lower: 74,
     upper: 88,
   },
   worstNightDecile: {
-    date: "2026-02-03",
-    sleepScore: 71,
+    date: getRelativeDate(28),
+    sleepScore: 70,
   },
 };
 
@@ -149,16 +160,24 @@ function buildTrendsPayload(filter: TrendsFilter): TrendsResponse {
 }
 
 const mockNightsListPayload: NightsListResponse = {
-  nights: mockTrendsPayload.nights.map((night, index) => ({
-    nightId: `night-${index + 1}`,
-    date: night.date,
-    label: `Night ${index + 1}`,
-    hasCapData: index % 3 !== 0,
-  })),
+  nights: [
+    {
+      nightId: "night-latest",
+      date: yesterday,
+      label: "Last Night",
+      hasCapData: true,
+    },
+    ...mockTrendsPayload.nights.slice(0, 11).map((night, index) => ({
+      nightId: `night-${index + 1}`,
+      date: night.date,
+      label: `Night ${index + 1}`,
+      hasCapData: index % 3 !== 0,
+    })),
+  ],
 };
 
 const mockNightPayload: NightResponse = {
-  date: "2026-02-26",
+  date: yesterday,
   epochs: mockHomePayload.summaryHypnogram.epochs.map((epoch, index) => ({
     ...epoch,
     epochIndex: index,
@@ -185,10 +204,10 @@ const mockNightPayload: NightResponse = {
 const mockSettingsProfilePayload: SettingsProfileResponse = {
   profile: {
     id: "usr_01J6QK9F6N3M4B5C6D7E8F9G",
-    username: "jordan_leung",
-    email: "jordan.leung@noctishealth.example",
+    username: "andrean_taja",
+    email: "andrean1710taja1234@gmail.com",
     createdAt: "2026-02-20T08:12:00Z",
-    updatedAt: "2026-02-27T09:20:00Z",
+    updatedAt: new Date().toISOString(),
   },
 };
 
@@ -206,7 +225,7 @@ const knownDeviceExternalIds = new Set(["noctis-halo-s1-001"]);
 
 const mockLatestSummary: BackendSleepSummary = backendSleepSummarySchema.parse({
   recordingId: "recording-001",
-  dateLocal: "2026-02-26",
+  dateLocal: yesterday,
   score: 84,
   totals: {
     totalSleepMin: 418,
@@ -280,8 +299,8 @@ const mockAuthResponse: AuthResponse = {
   expires_in: 3600,
   user: {
     id: "usr_01J6QK9F6N3M4B5C6D7E8F9G",
-    username: "sample_user",
-    email: "sample@noctis.example",
+    username: "andrean_taja",
+    email: "andrean1710taja1234@gmail.com",
     created_at: "2026-02-27T00:00:00Z",
     updated_at: "2026-02-27T00:00:00Z",
   },
