@@ -101,8 +101,8 @@ const mockHomePayload: HomeResponse = {
 
 const mockTrendsPayload: TrendsResponse = {
   activeFilter: "30D",
-  nights: Array.from({ length: 30 }).map((_, i) => {
-    const date = getRelativeDate(30 - i);
+  nights: Array.from({ length: 100 }).map((_, i) => {
+    const date = getRelativeDate(100 - i);
     return {
       date,
       sleepScore: 70 + (i % 20),
@@ -137,12 +137,12 @@ function getWindowSize(filter: TrendsFilter): number {
   if (filter === "90D") {
     return 90;
   }
-  return 5;
+  return 30;
 }
 
 function buildTrendsPayload(filter: TrendsFilter): TrendsResponse {
   const windowSize = getWindowSize(filter);
-  const nights = mockTrendsPayload.nights.slice(-Math.min(windowSize, mockTrendsPayload.nights.length));
+  const nights = mockTrendsPayload.nights.slice(-windowSize);
   const worstNight = nights.reduce(
     (lowest, current) => (current.sleepScore < lowest.sleepScore ? current : lowest),
     nights[0] ?? mockTrendsPayload.worstNightDecile,
@@ -152,6 +152,7 @@ function buildTrendsPayload(filter: TrendsFilter): TrendsResponse {
     ...mockTrendsPayload,
     activeFilter: filter,
     nights,
+    movingAverageWindow: windowSize,
     worstNightDecile: {
       date: worstNight.date,
       sleepScore: worstNight.sleepScore,

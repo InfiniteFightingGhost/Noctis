@@ -27,22 +27,18 @@ describe("trends page", () => {
   });
 
   it("updates rendered trend window when filter changes", async () => {
-    const getRelativeDate = (daysAgo: number) => {
-      const d = new Date();
-      d.setDate(d.getDate() - daysAgo);
-      return d.toISOString().split("T")[0];
-    };
-
     render(
       <MemoryRouter initialEntries={["/trends"]}>
         <AppShell />
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText(getRelativeDate(30))).toBeInTheDocument();
+    // Initial 30D view
+    expect(await screen.findByText(/Moving average 30 nights/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "7D" }));
 
-    expect(await screen.findByText(getRelativeDate(7))).toBeInTheDocument();
+    // Switched to 7D view
+    expect(await screen.findByText(/Moving average 7 nights/i)).toBeInTheDocument();
   });
 });
