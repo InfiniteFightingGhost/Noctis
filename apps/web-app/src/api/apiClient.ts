@@ -1,7 +1,6 @@
 import { httpApiClient } from "./httpApiClient";
 import { apiClient as mockApiClient } from "./mockApiClient";
 
-const hasApiBaseUrl = typeof import.meta.env.VITE_API_BASE_URL === "string" && import.meta.env.VITE_API_BASE_URL.length > 0;
 const MOCK_EMAIL = "andrean1710taja1234@gmail.com";
 
 const getStorage = () => {
