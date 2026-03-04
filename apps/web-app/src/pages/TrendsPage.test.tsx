@@ -27,16 +27,22 @@ describe("trends page", () => {
   });
 
   it("updates rendered trend window when filter changes", async () => {
+    const getRelativeDate = (daysAgo: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - daysAgo);
+      return d.toISOString().split("T")[0];
+    };
+
     render(
       <MemoryRouter initialEntries={["/trends"]}>
         <AppShell />
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("2026-02-01")).toBeInTheDocument();
+    expect(await screen.findByText(getRelativeDate(30))).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "7D" }));
 
-    expect(await screen.findByText("2026-02-06")).toBeInTheDocument();
+    expect(await screen.findByText(getRelativeDate(7))).toBeInTheDocument();
   });
 });
